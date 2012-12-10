@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_FROM_FRAMEBUFFER_NATIVE_WINDOW_CPP
-#warning "FramebufferNativeWindow is deprecated"
-#endif
-
 #ifndef ANDROID_FRAMEBUFFER_NATIVE_WINDOW_H
 #define ANDROID_FRAMEBUFFER_NATIVE_WINDOW_H
 
@@ -31,6 +27,9 @@
 
 #include <ui/ANativeObjectBase.h>
 #include <ui/Rect.h>
+
+#include <hardware/fb.h>
+#include <hardware/gralloc.h>
 
 #ifdef STE_SAMSUNG_HARDWARE
 #define NUM_FRAME_BUFFERS 3
