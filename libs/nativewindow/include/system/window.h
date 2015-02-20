@@ -55,7 +55,7 @@
 __BEGIN_DECLS
 
 /*****************************************************************************/
-
+#ifndef FRAMEBUFFER_NATIVEWINDOW
 #define ANDROID_NATIVE_WINDOW_MAGIC     ANDROID_NATIVE_MAKE_CONSTANT('_','w','n','d')
 
 // ---------------------------------------------------------------------------
@@ -528,7 +528,7 @@ struct ANativeWindow
     int     (*cancelBuffer)(struct ANativeWindow* window,
                 struct ANativeWindowBuffer* buffer, int fenceFd);
 };
-
+#endif
  /* Backwards compatibility: use ANativeWindow (struct ANativeWindow in C).
   * android_native_window_t is deprecated.
   */

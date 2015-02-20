@@ -27,9 +27,10 @@
 #include <utils/threads.h>
 #include <utils/RefBase.h>
 
+#include <ui/FramebufferNativeWindow.h>
+
 #include <ui/ANativeObjectBase.h>
 #include <ui/Fence.h>
-#include <ui/FramebufferNativeWindow.h>
 #include <ui/Rect.h>
 
 #include <EGL/egl.h>
