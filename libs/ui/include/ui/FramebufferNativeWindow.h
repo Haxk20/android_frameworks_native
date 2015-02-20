@@ -25,6 +25,9 @@
 #include <utils/threads.h>
 #include <utils/String8.h>
 
+#define FRAMEBUFFER_NATIVEWINDOW
+#include <nativebase/nativebase.h>
+
 #include <ui/ANativeObjectBase.h>
 #include <ui/Rect.h>
 
