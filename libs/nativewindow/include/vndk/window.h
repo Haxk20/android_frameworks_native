@@ -61,7 +61,7 @@ int ANativeWindow_OemStorageGet(ANativeWindow* window, uint32_t slot, intptr_t* 
  */
 int ANativeWindow_setSwapInterval(ANativeWindow* window, int interval);
 
-
+#ifndef FRAMEBUFFER_NATIVEWINDOW
 /*
  * queries that can be used with ANativeWindow_query() and ANativeWindow_queryf()
  */
@@ -165,6 +165,7 @@ enum ANativeWindowQuery {
     /* vertical resolution in DPI. value is float, use queryf() */
     ANATIVEWINDOW_QUERY_YDPI = 0x10003,
 };
+#endif
 
 typedef enum ANativeWindowQuery ANativeWindowQuery;
 
