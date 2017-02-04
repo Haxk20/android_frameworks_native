@@ -479,6 +479,7 @@ status_t GraphicBuffer::unflatten(
         status_t err = mBufferMapper.importBuffer(handle);
         if (err != NO_ERROR) {
             width = height = stride = format = layerCount = usage = 0;
+            native_handle_delete(const_cast<native_handle*>(handle));
             handle = NULL;
             ALOGE("unflatten: registerBuffer failed: %s (%d)",
                     strerror(-err), err);
