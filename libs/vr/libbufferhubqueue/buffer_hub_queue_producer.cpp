@@ -131,9 +131,9 @@ status_t BufferHubQueueProducer::setAsyncMode(bool async) {
 
 status_t BufferHubQueueProducer::dequeueBuffer(
     int* out_slot, sp<Fence>* out_fence, uint32_t width, uint32_t height,
-    PixelFormat format, uint64_t usage, uint64_t* /*outBufferAge*/,
+    PixelFormat format, uint32_t usage, uint64_t* /*outBufferAge*/,
     FrameEventHistoryDelta* /* out_timestamps */) {
-  ALOGD_IF(TRACE, "dequeueBuffer: w=%u, h=%u, format=%d, usage=%" PRIu64, width,
+  ALOGD_IF(TRACE, "dequeueBuffer: w=%u, h=%u, format=%d, usage=%" PRIu32, width,
            height, format, usage);
 
   status_t ret;
@@ -533,7 +533,7 @@ status_t BufferHubQueueProducer::setSidebandStream(
 void BufferHubQueueProducer::allocateBuffers(uint32_t /* width */,
                                              uint32_t /* height */,
                                              PixelFormat /* format */,
-                                             uint64_t /* usage */) {
+                                             uint32_t /* usage */) {
   // TODO(jwcai) |allocateBuffers| aims to preallocate up to the maximum number
   // of buffers permitted by the current BufferQueue configuration (aka
   // |max_buffer_count_|).
@@ -606,6 +606,14 @@ status_t BufferHubQueueProducer::getUniqueId(uint64_t* out_id) const {
   ALOGD_IF(TRACE, __FUNCTION__);
 
   *out_id = unique_id_;
+  return NO_ERROR;
+}
+
+status_t BufferHubQueueProducer::getConsumerUsage(uint32_t* out_usage) const {
+  ALOGD_IF(TRACE, __FUNCTION__);
+
+  // same value as returned by querying NATIVE_WINDOW_CONSUMER_USAGE_BITS
+  *out_usage = 0;
   return NO_ERROR;
 }
 
