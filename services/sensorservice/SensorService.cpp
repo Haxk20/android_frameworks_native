@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include <cutils/properties.h>
+
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
-#include <cutils/ashmem.h>
-#include <cutils/properties.h>
+
+#include <sensor/SensorEventQueue.h>
+
 #include <hardware/sensors.h>
 #include <hardware_legacy/power.h>
-#include <log/log.h>
+
 #include <openssl/digest.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
-#include <sensor/SensorEventQueue.h>
-#include <utils/SystemClock.h>
 
 #include "BatteryService.h"
 #include "CorrectedGyroSensor.h"
@@ -38,7 +40,6 @@
 #include "SensorInterface.h"
 
 #include "SensorService.h"
-#include "SensorDirectConnection.h"
 #include "SensorEventAckReceiver.h"
 #include "SensorEventConnection.h"
 #include "SensorRecord.h"
@@ -74,8 +75,7 @@ bool SensorService::sHmacGlobalKeyIsValid = false;
 #define SENSOR_SERVICE_SCHED_FIFO_PRIORITY 10
 
 // Permissions.
-static const String16 sDumpPermission("android.permission.DUMP");
-static const String16 sLocationHardwarePermission("android.permission.LOCATION_HARDWARE");
+static const String16 sDump("android.permission.DUMP");
 
 SensorService::SensorService()
     : mInitCheck(NO_INIT), mSocketBufferSize(SOCKET_BUFFER_SIZE_NON_BATCHED),
@@ -320,7 +320,7 @@ SensorService::~SensorService() {
 
 status_t SensorService::dump(int fd, const Vector<String16>& args) {
     String8 result;
-    if (!PermissionCache::checkCallingPermission(sDumpPermission)) {
+    if (!PermissionCache::checkCallingPermission(sDump)) {
         result.appendFormat("Permission Denial: can't dump SensorService from pid=%d, uid=%d\n",
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());
@@ -340,16 +340,7 @@ status_t SensorService::dump(int fd, const Vector<String16>& args) {
             if (mCurrentOperatingMode != NORMAL) {
                 return INVALID_OPERATION;
             }
-
             mCurrentOperatingMode = RESTRICTED;
-            // temporarily stop all sensor direct report
-            for (auto &i : mDirectConnections) {
-                sp<SensorDirectConnection> connection(i.promote());
-                if (connection != nullptr) {
-                    connection->stopAll(true /* backupRecord */);
-                }
-            }
-
             dev.disableAllSensors();
             // Clear all pending flush connections for all active sensors. If one of the active
             // connections has called flush() and the underlying sensor has been disabled before a
@@ -364,13 +355,6 @@ status_t SensorService::dump(int fd, const Vector<String16>& args) {
             if (mCurrentOperatingMode == RESTRICTED) {
                 mCurrentOperatingMode = NORMAL;
                 dev.enableAllSensors();
-                // recover all sensor direct report
-                for (auto &i : mDirectConnections) {
-                    sp<SensorDirectConnection> connection(i.promote());
-                    if (connection != nullptr) {
-                        connection->recoverAll();
-                    }
-                }
             }
             if (mCurrentOperatingMode == DATA_INJECTION) {
                resetToNormalModeLocked();
@@ -398,7 +382,6 @@ status_t SensorService::dump(int fd, const Vector<String16>& args) {
             }
         } else if (!mSensors.hasAnySensor()) {
             result.append("No Sensors on the device\n");
-            result.appendFormat("devInitCheck : %d\n", SensorDevice::getInstance().initCheck());
         } else {
             // Default dump the sensor list and debugging information.
             //
@@ -450,21 +433,12 @@ status_t SensorService::dump(int fd, const Vector<String16>& args) {
                case DATA_INJECTION:
                    result.appendFormat(" DATA_INJECTION : %s\n", mWhiteListedPackage.string());
             }
-
             result.appendFormat("%zd active connections\n", mActiveConnections.size());
+
             for (size_t i=0 ; i < mActiveConnections.size() ; i++) {
                 sp<SensorEventConnection> connection(mActiveConnections[i].promote());
                 if (connection != 0) {
                     result.appendFormat("Connection Number: %zu \n", i);
-                    connection->dump(result);
-                }
-            }
-
-            result.appendFormat("%zd direct connections\n", mDirectConnections.size());
-            for (size_t i = 0 ; i < mDirectConnections.size() ; i++) {
-                sp<SensorDirectConnection> connection(mDirectConnections[i].promote());
-                if (connection != nullptr) {
-                    result.appendFormat("Direct connection %zu:\n", i);
                     connection->dump(result);
                 }
             }
@@ -482,7 +456,17 @@ status_t SensorService::dump(int fd, const Vector<String16>& args) {
                         SENSOR_REGISTRATIONS_BUF_SIZE;
                     continue;
                 }
-                result.appendFormat("%s\n", reg_info.dump().c_str());
+                if (reg_info.mActivated) {
+                   result.appendFormat("%02d:%02d:%02d activated handle=0x%08x "
+                           "samplingRate=%dus maxReportLatency=%dus package=%s\n",
+                           reg_info.mHour, reg_info.mMin, reg_info.mSec, reg_info.mSensorHandle,
+                           reg_info.mSamplingRateUs, reg_info.mMaxReportLatencyUs,
+                           reg_info.mPackageName.string());
+                } else {
+                   result.appendFormat("%02d:%02d:%02d de-activated handle=0x%08x package=%s\n",
+                           reg_info.mHour, reg_info.mMin, reg_info.mSec,
+                           reg_info.mSensorHandle, reg_info.mPackageName.string());
+                }
                 currentIndex = (currentIndex - 1 + SENSOR_REGISTRATIONS_BUF_SIZE) %
                         SENSOR_REGISTRATIONS_BUF_SIZE;
             } while(startIndex != currentIndex);
@@ -887,7 +871,7 @@ void SensorService::makeUuidsIntoIdsForSensorList(Vector<Sensor> &sensorList) co
     }
 }
 
-Vector<Sensor> SensorService::getSensorList(const String16& /* opPackageName */) {
+Vector<Sensor> SensorService::getSensorList(const String16& opPackageName) {
     char value[PROPERTY_VALUE_MAX];
     property_get("debug.sensors", value, "0");
     const Vector<Sensor>& initialSensorList = (atoi(value)) ?
@@ -895,7 +879,14 @@ Vector<Sensor> SensorService::getSensorList(const String16& /* opPackageName */)
     Vector<Sensor> accessibleSensorList;
     for (size_t i = 0; i < initialSensorList.size(); i++) {
         Sensor sensor = initialSensorList[i];
-        accessibleSensorList.add(sensor);
+        if (canAccessSensor(sensor, "getSensorList", opPackageName)) {
+            accessibleSensorList.add(sensor);
+        } else {
+            ALOGI("Skipped sensor %s because it requires permission %s and app op %d",
+                  sensor.getName().string(),
+                  sensor.getRequiredPermission().string(),
+                  sensor.getRequiredAppOp());
+        }
     }
     makeUuidsIntoIdsForSensorList(accessibleSensorList);
     return accessibleSensorList;
@@ -937,14 +928,8 @@ sp<ISensorEventConnection> SensorService::createSensorEventConnection(const Stri
     }
 
     uid_t uid = IPCThreadState::self()->getCallingUid();
-    pid_t pid = IPCThreadState::self()->getCallingPid();
-
-    String8 connPackageName =
-            (packageName == "") ? String8::format("unknown_package_pid_%d", pid) : packageName;
-    String16 connOpPackageName =
-            (opPackageName == String16("")) ? String16(connPackageName) : opPackageName;
-    sp<SensorEventConnection> result(new SensorEventConnection(this, uid, connPackageName,
-            requestedMode == DATA_INJECTION, connOpPackageName));
+    sp<SensorEventConnection> result(new SensorEventConnection(this, uid, packageName,
+            requestedMode == DATA_INJECTION, opPackageName));
     if (requestedMode == DATA_INJECTION) {
         if (mActiveConnections.indexOf(result) < 0) {
             mActiveConnections.add(result);
@@ -961,183 +946,6 @@ int SensorService::isDataInjectionEnabled() {
     return (mCurrentOperatingMode == DATA_INJECTION);
 }
 
-sp<ISensorEventConnection> SensorService::createSensorDirectConnection(
-        const String16& opPackageName, uint32_t size, int32_t type, int32_t format,
-        const native_handle *resource) {
-    Mutex::Autolock _l(mLock);
-
-    struct sensors_direct_mem_t mem = {
-        .type = type,
-        .format = format,
-        .size = size,
-        .handle = resource,
-    };
-    uid_t uid = IPCThreadState::self()->getCallingUid();
-
-    if (mem.handle == nullptr) {
-        ALOGE("Failed to clone resource handle");
-        return nullptr;
-    }
-
-    // check format
-    if (format != SENSOR_DIRECT_FMT_SENSORS_EVENT) {
-        ALOGE("Direct channel format %d is unsupported!", format);
-        return nullptr;
-    }
-
-    // check for duplication
-    for (auto &i : mDirectConnections) {
-        sp<SensorDirectConnection> connection(i.promote());
-        if (connection != nullptr && connection->isEquivalent(&mem)) {
-            ALOGE("Duplicate create channel request for the same share memory");
-            return nullptr;
-        }
-    }
-
-    // check specific to memory type
-    switch(type) {
-        case SENSOR_DIRECT_MEM_TYPE_ASHMEM: { // channel backed by ashmem
-            if (resource->numFds < 1) {
-                ALOGE("Ashmem direct channel requires a memory region to be supplied");
-                android_errorWriteLog(0x534e4554, "70986337");  // SafetyNet
-                return nullptr;
-            }
-            int fd = resource->data[0];
-            int size2 = ashmem_get_size_region(fd);
-            // check size consistency
-            if (size2 < static_cast<int64_t>(size)) {
-                ALOGE("Ashmem direct channel size %" PRIu32 " greater than shared memory size %d",
-                      size, size2);
-                return nullptr;
-            }
-            break;
-        }
-        case SENSOR_DIRECT_MEM_TYPE_GRALLOC:
-            // no specific checks for gralloc
-            break;
-        default:
-            ALOGE("Unknown direct connection memory type %d", type);
-            return nullptr;
-    }
-
-    native_handle_t *clone = native_handle_clone(resource);
-    if (!clone) {
-        return nullptr;
-    }
-
-    SensorDirectConnection* conn = nullptr;
-    SensorDevice& dev(SensorDevice::getInstance());
-    int channelHandle = dev.registerDirectChannel(&mem);
-
-    if (channelHandle <= 0) {
-        ALOGE("SensorDevice::registerDirectChannel returns %d", channelHandle);
-    } else {
-        mem.handle = clone;
-        conn = new SensorDirectConnection(this, uid, &mem, channelHandle, opPackageName);
-    }
-
-    if (conn == nullptr) {
-        native_handle_close(clone);
-        native_handle_delete(clone);
-    } else {
-        // add to list of direct connections
-        // sensor service should never hold pointer or sp of SensorDirectConnection object.
-        mDirectConnections.add(wp<SensorDirectConnection>(conn));
-    }
-    return conn;
-}
-
-int SensorService::setOperationParameter(
-            int32_t handle, int32_t type,
-            const Vector<float> &floats, const Vector<int32_t> &ints) {
-    Mutex::Autolock _l(mLock);
-
-    if (!checkCallingPermission(sLocationHardwarePermission, nullptr, nullptr)) {
-        return PERMISSION_DENIED;
-    }
-
-    bool isFloat = true;
-    bool isCustom = false;
-    size_t expectSize = INT32_MAX;
-    switch (type) {
-        case AINFO_LOCAL_GEOMAGNETIC_FIELD:
-            isFloat = true;
-            expectSize = 3;
-            break;
-        case AINFO_LOCAL_GRAVITY:
-            isFloat = true;
-            expectSize = 1;
-            break;
-        case AINFO_DOCK_STATE:
-        case AINFO_HIGH_PERFORMANCE_MODE:
-        case AINFO_MAGNETIC_FIELD_CALIBRATION:
-            isFloat = false;
-            expectSize = 1;
-            break;
-        default:
-            // CUSTOM events must only contain float data; it may have variable size
-            if (type < AINFO_CUSTOM_START || type >= AINFO_DEBUGGING_START ||
-                    ints.size() ||
-                    sizeof(additional_info_event_t::data_float)/sizeof(float) < floats.size() ||
-                    handle < 0) {
-                return BAD_VALUE;
-            }
-            isFloat = true;
-            isCustom = true;
-            expectSize = floats.size();
-            break;
-    }
-
-    if (!isCustom && handle != -1) {
-        return BAD_VALUE;
-    }
-
-    // three events: first one is begin tag, last one is end tag, the one in the middle
-    // is the payload.
-    sensors_event_t event[3];
-    int64_t timestamp = elapsedRealtimeNano();
-    for (sensors_event_t* i = event; i < event + 3; i++) {
-        *i = (sensors_event_t) {
-            .version = sizeof(sensors_event_t),
-            .sensor = handle,
-            .type = SENSOR_TYPE_ADDITIONAL_INFO,
-            .timestamp = timestamp++,
-            .additional_info = (additional_info_event_t) {
-                .serial = 0
-            }
-        };
-    }
-
-    event[0].additional_info.type = AINFO_BEGIN;
-    event[1].additional_info.type = type;
-    event[2].additional_info.type = AINFO_END;
-
-    if (isFloat) {
-        if (floats.size() != expectSize) {
-            return BAD_VALUE;
-        }
-        for (size_t i = 0; i < expectSize; ++i) {
-            event[1].additional_info.data_float[i] = floats[i];
-        }
-    } else {
-        if (ints.size() != expectSize) {
-            return BAD_VALUE;
-        }
-        for (size_t i = 0; i < expectSize; ++i) {
-            event[1].additional_info.data_int32[i] = ints[i];
-        }
-    }
-
-    SensorDevice& dev(SensorDevice::getInstance());
-    for (sensors_event_t* i = event; i < event + 3; i++) {
-        int ret = dev.injectSensorData(i);
-        if (ret != NO_ERROR) {
-            return ret;
-        }
-    }
-    return NO_ERROR;
-}
-
 status_t SensorService::resetToNormalMode() {
     Mutex::Autolock _l(mLock);
     return resetToNormalModeLocked();
@@ -1145,11 +953,9 @@ status_t SensorService::resetToNormalMode() {
 
 status_t SensorService::resetToNormalModeLocked() {
     SensorDevice& dev(SensorDevice::getInstance());
+    dev.enableAllSensors();
     status_t err = dev.setMode(NORMAL);
-    if (err == NO_ERROR) {
-        mCurrentOperatingMode = NORMAL;
-        dev.enableAllSensors();
-    }
+    mCurrentOperatingMode = NORMAL;
     return err;
 }
 
@@ -1197,17 +1003,10 @@ void SensorService::cleanupConnection(SensorEventConnection* c) {
     dev.notifyConnectionDestroyed(c);
 }
 
-void SensorService::cleanupConnection(SensorDirectConnection* c) {
-    Mutex::Autolock _l(mLock);
-
-    SensorDevice& dev(SensorDevice::getInstance());
-    dev.unregisterDirectChannel(c->getHalChannelHandle());
-    mDirectConnections.remove(c);
-}
-
 sp<SensorInterface> SensorService::getSensorInterfaceFromHandle(int handle) const {
     return mSensors.getInterface(handle);
 }
+
 
 status_t SensorService::enable(const sp<SensorEventConnection>& connection,
         int handle, nsecs_t samplingPeriodNs, nsecs_t maxBatchReportLatencyNs, int reservedFlags,
@@ -1222,7 +1021,7 @@ status_t SensorService::enable(const sp<SensorEventConnection>& connection,
     }
 
     Mutex::Autolock _l(mLock);
-    if (mCurrentOperatingMode != NORMAL
+    if ((mCurrentOperatingMode == RESTRICTED || mCurrentOperatingMode == DATA_INJECTION)
            && !isWhiteListedPackage(connection->getPackageName())) {
         return INVALID_OPERATION;
     }
@@ -1278,12 +1077,6 @@ status_t SensorService::enable(const sp<SensorEventConnection>& connection,
             handle, connection.get());
     }
 
-    // Check maximum delay for the sensor.
-    nsecs_t maxDelayNs = sensor->getSensor().getMaxDelay() * 1000LL;
-    if (maxDelayNs > 0 && (samplingPeriodNs > maxDelayNs)) {
-        samplingPeriodNs = maxDelayNs;
-    }
-
     nsecs_t minDelayNs = sensor->getSensor().getMinDelayNs();
     if (samplingPeriodNs < minDelayNs) {
         samplingPeriodNs = minDelayNs;
@@ -1322,10 +1115,18 @@ status_t SensorService::enable(const sp<SensorEventConnection>& connection,
 
     if (err == NO_ERROR) {
         connection->updateLooperRegistration(mLooper);
-
-        mLastNSensorRegistrations.editItemAt(mNextSensorRegIndex) =
-                SensorRegistrationInfo(handle, connection->getPackageName(),
-                                       samplingPeriodNs, maxBatchReportLatencyNs, true);
+        SensorRegistrationInfo &reg_info =
+            mLastNSensorRegistrations.editItemAt(mNextSensorRegIndex);
+        reg_info.mSensorHandle = handle;
+        reg_info.mSamplingRateUs = samplingPeriodNs/1000;
+        reg_info.mMaxReportLatencyUs = maxBatchReportLatencyNs/1000;
+        reg_info.mActivated = true;
+        reg_info.mPackageName = connection->getPackageName();
+        time_t rawtime = time(NULL);
+        struct tm * timeinfo = localtime(&rawtime);
+        reg_info.mHour = timeinfo->tm_hour;
+        reg_info.mMin = timeinfo->tm_min;
+        reg_info.mSec = timeinfo->tm_sec;
         mNextSensorRegIndex = (mNextSensorRegIndex + 1) % SENSOR_REGISTRATIONS_BUF_SIZE;
     }
 
@@ -1348,8 +1149,16 @@ status_t SensorService::disable(const sp<SensorEventConnection>& connection, int
 
     }
     if (err == NO_ERROR) {
-        mLastNSensorRegistrations.editItemAt(mNextSensorRegIndex) =
-                SensorRegistrationInfo(handle, connection->getPackageName(), 0, 0, false);
+        SensorRegistrationInfo &reg_info =
+            mLastNSensorRegistrations.editItemAt(mNextSensorRegIndex);
+        reg_info.mActivated = false;
+        reg_info.mPackageName= connection->getPackageName();
+        reg_info.mSensorHandle = handle;
+        time_t rawtime = time(NULL);
+        struct tm * timeinfo = localtime(&rawtime);
+        reg_info.mHour = timeinfo->tm_hour;
+        reg_info.mMin = timeinfo->tm_min;
+        reg_info.mSec = timeinfo->tm_sec;
         mNextSensorRegIndex = (mNextSensorRegIndex + 1) % SENSOR_REGISTRATIONS_BUF_SIZE;
     }
     return err;
@@ -1530,13 +1339,5 @@ bool SensorService::isWhiteListedPackage(const String8& packageName) {
     return (packageName.contains(mWhiteListedPackage.string()));
 }
 
-bool SensorService::isOperationRestricted(const String16& opPackageName) {
-    Mutex::Autolock _l(mLock);
-    if (mCurrentOperatingMode != RESTRICTED) {
-        String8 package(opPackageName);
-        return !isWhiteListedPackage(package);
-    }
-    return false;
-}
-
 }; // namespace android
+

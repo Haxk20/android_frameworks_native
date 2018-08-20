@@ -49,9 +49,9 @@
 #define IGNORE_HARDWARE_FUSION  false
 #define DEBUG_CONNECTIONS   false
 // Max size is 100 KB which is enough to accept a batch of about 1000 events.
-#define MAX_SOCKET_BUFFER_SIZE_BATCHED (100 * 1024)
+#define MAX_SOCKET_BUFFER_SIZE_BATCHED 100 * 1024
 // For older HALs which don't support batching, use a smaller socket buffer size.
-#define SOCKET_BUFFER_SIZE_NON_BATCHED (4 * 1024)
+#define SOCKET_BUFFER_SIZE_NON_BATCHED 4 * 1024
 
 #define SENSOR_REGISTRATIONS_BUF_SIZE 200
 
@@ -67,11 +67,9 @@ class SensorService :
 {
     // nested class/struct for internal use
     class SensorEventConnection;
-    class SensorDirectConnection;
 
 public:
     void cleanupConnection(SensorEventConnection* connection);
-    void cleanupConnection(SensorDirectConnection* c);
 
     status_t enable(const sp<SensorEventConnection>& connection, int handle,
                     nsecs_t samplingPeriodNs,  nsecs_t maxBatchReportLatencyNs, int reservedFlags,
@@ -91,7 +89,7 @@ private:
     // nested class/struct for internal use
     class SensorRecord;
     class SensorEventAckReceiver;
-    class SensorRegistrationInfo;
+    struct SensorRegistrationInfo;
 
     enum Mode {
        // The regular operating mode where any application can register/unregister/call flush on
@@ -156,10 +154,6 @@ private:
             const String8& packageName,
             int requestedMode, const String16& opPackageName);
     virtual int isDataInjectionEnabled();
-    virtual sp<ISensorEventConnection> createSensorDirectConnection(const String16& opPackageName,
-            uint32_t size, int32_t type, int32_t format, const native_handle *resource);
-    virtual int setOperationParameter(
-            int32_t handle, int32_t type, const Vector<float> &floats, const Vector<int32_t> &ints);
     virtual status_t dump(int fd, const Vector<String16>& args);
 
     String8 getSensorName(int handle) const;
@@ -209,7 +203,6 @@ private:
     // allowed to register for or call flush on sensors. Typically only cts test packages are
     // allowed.
     bool isWhiteListedPackage(const String8& packageName);
-    bool isOperationRestricted(const String16& opPackageName);
 
     // Reset the state of SensorService to NORMAL mode.
     status_t resetToNormalMode();
@@ -246,7 +239,6 @@ private:
     sensors_event_t *mSensorEventBuffer, *mSensorEventScratch;
     wp<const SensorEventConnection> * mMapFlushEventsToConnections;
     std::unordered_map<int, RecentEventLogger*> mRecentEvent;
-    SortedVector< wp<SensorDirectConnection> > mDirectConnections;
     Mode mCurrentOperatingMode;
 
     // This packagaName is set when SensorService is in RESTRICTED or DATA_INJECTION mode. Only

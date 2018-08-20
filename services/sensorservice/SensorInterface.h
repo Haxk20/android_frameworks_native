@@ -47,7 +47,7 @@ public:
 
 class BaseSensor : public SensorInterface {
 public:
-    explicit BaseSensor(const sensor_t& sensor);
+    BaseSensor(const sensor_t& sensor);
     BaseSensor(const sensor_t& sensor, const uint8_t (&uuid)[16]);
 
     // Not all sensors need to support batching.
@@ -74,7 +74,7 @@ protected:
 
 class HardwareSensor : public BaseSensor {
 public:
-    explicit HardwareSensor(const sensor_t& sensor);
+    HardwareSensor(const sensor_t& sensor);
     HardwareSensor(const sensor_t& sensor, const uint8_t (&uuid)[16]);
 
     virtual ~HardwareSensor();

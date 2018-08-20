@@ -23,8 +23,6 @@
 #include "SensorEventConnection.h"
 #include "SensorDevice.h"
 
-#define UNUSED(x) (void)(x)
-
 namespace android {
 
 SensorService::SensorEventConnection::SensorEventConnection(
@@ -477,14 +475,7 @@ void SensorService::SensorEventConnection::countFlushCompleteEventsLocked(
     // separately before the next batch of events.
     for (int j = 0; j < numEventsDropped; ++j) {
         if (scratch[j].type == SENSOR_TYPE_META_DATA) {
-            ssize_t index = mSensorInfo.indexOfKey(scratch[j].meta_data.sensor);
-            if (index < 0) {
-                ALOGW("%s: sensor 0x%x is not found in connection",
-                      __func__, scratch[j].meta_data.sensor);
-                continue;
-            }
-
-            FlushInfo& flushInfo = mSensorInfo.editValueAt(index);
+            FlushInfo& flushInfo = mSensorInfo.editValueFor(scratch[j].meta_data.sensor);
             flushInfo.mPendingFlushEventsToSend++;
             ALOGD_IF(DEBUG_CONNECTIONS, "increment pendingFlushCount %d",
                      flushInfo.mPendingFlushEventsToSend);
@@ -531,13 +522,6 @@ status_t SensorService::SensorEventConnection::setEventRate(
 
 status_t  SensorService::SensorEventConnection::flush() {
     return  mService->flushSensor(this, mOpPackageName);
-}
-
-int32_t SensorService::SensorEventConnection::configureChannel(int handle, int rateLevel) {
-    // SensorEventConnection does not support configureChannel, parameters not used
-    UNUSED(handle);
-    UNUSED(rateLevel);
-    return INVALID_OPERATION;
 }
 
 int SensorService::SensorEventConnection::handleEvent(int fd, int events, void* /*data*/) {
