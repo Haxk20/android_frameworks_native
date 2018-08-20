@@ -84,6 +84,10 @@ public:
             uint32_t inLayerCount, uint64_t inUsage,
             std::string requestorName = "<Unknown>");
 
+    GraphicBuffer(uint32_t inWidth, uint32_t inHeight, PixelFormat inFormat,
+            uint32_t inUsage, uint32_t inStride, native_handle_t* inHandle,
+            bool keepOwnership);
+
     // Create a GraphicBuffer from an existing handle.
     enum HandleWrapMethod : uint8_t {
         // Wrap and use the handle directly.  It assumes the handle has been
@@ -134,6 +138,9 @@ public:
             native_handle_t* inHandle, bool keepOwnership);
     GraphicBuffer(uint32_t inWidth, uint32_t inHeight, PixelFormat inFormat,
             uint32_t inUsage, std::string requestorName = "<Unknown>");
+
+    // create a buffer from an existing ANativeWindowBuffer
+    GraphicBuffer(ANativeWindowBuffer* buffer, bool keepOwnership);
 
     // return status
     status_t initCheck() const;
