@@ -81,7 +81,6 @@ cc_library {
     cflags: [
         "-Wall",
         "-Wextra",
-        "-Werror",
         "-DDISABLE_ASHMEM_TRACKING",
     ],
     product_variables: {
