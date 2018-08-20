@@ -45,7 +45,7 @@ sp<GraphicBuffer> GraphicBuffer::from(ANativeWindowBuffer* anwb) {
 
 GraphicBuffer::GraphicBuffer()
     : BASE(), mOwner(ownData), mBufferMapper(GraphicBufferMapper::get()),
-      mInitCheck(NO_ERROR), mId(getUniqueId()), mGenerationNumber(0)
+      mInitCheck(NO_ERROR), mId(getUniqueId())
 {
     width  =
     height =
@@ -80,6 +80,35 @@ GraphicBuffer::GraphicBuffer(uint32_t inWidth, uint32_t inHeight,
             inWidth, inHeight, inFormat, inLayerCount, static_cast<uint64_t>(inUsage),
             inStride)
 {
+}
+
+GraphicBuffer::GraphicBuffer(uint32_t inWidth, uint32_t inHeight,
+        PixelFormat inFormat, uint32_t inUsage, uint32_t inStride,
+        native_handle_t* inHandle, bool keepOwnership)
+    : BASE(), mOwner(keepOwnership ? ownHandle : ownNone),
+      mBufferMapper(GraphicBufferMapper::get()),
+      mInitCheck(NO_ERROR), mId(getUniqueId())
+{
+    width  = static_cast<int>(inWidth);
+    height = static_cast<int>(inHeight);
+    stride = static_cast<int>(inStride);
+    format = inFormat;
+    usage  = static_cast<int>(inUsage);
+    handle = inHandle;
+}
+
+GraphicBuffer::GraphicBuffer(ANativeWindowBuffer* buffer, bool keepOwnership)
+    : BASE(), mOwner(keepOwnership ? ownHandle : ownNone),
+      mBufferMapper(GraphicBufferMapper::get()),
+      mInitCheck(NO_ERROR), mId(getUniqueId())
+{
+    width  = buffer->width;
+    height = buffer->height;
+    stride = buffer->stride;
+    format = buffer->format;
+    layerCount = buffer->layerCount;
+    usage  = buffer->usage;
+    handle = buffer->handle;
 }
 
 GraphicBuffer::GraphicBuffer(const native_handle_t* handle,
