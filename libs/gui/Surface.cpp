@@ -871,10 +871,6 @@ int Surface::query(int what, int* value) const {
                 *value = mFrameTimestampsSupportsPresent ? 1 : 0;
                 return NO_ERROR;
             }
-            case NATIVE_WINDOW_IS_VALID: {
-                *value = mGraphicBufferProducer != nullptr ? 1 : 0;
-                return NO_ERROR;
-            }
         }
     }
     return mGraphicBufferProducer->query(what, value);
