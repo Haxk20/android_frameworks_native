@@ -79,7 +79,7 @@ private:
         uint32_t stride;
         PixelFormat format;
         uint32_t layerCount;
-        uint64_t usage;
+        uint32_t usage;
         size_t size;
     };
 
