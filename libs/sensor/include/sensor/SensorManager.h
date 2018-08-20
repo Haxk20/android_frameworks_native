@@ -82,9 +82,6 @@ public:
     sp<SensorEventQueue> createEventQueue(String8 packageName = String8(""), int mode = 0);
 #endif
     bool isDataInjectionEnabled();
-    int createDirectChannel(size_t size, int channelType, const native_handle_t *channelData);
-    void destroyDirectChannel(int channelNativeHandle);
-    int configureDirectChannel(int channelNativeHandle, int sensorHandle, int rateLevel);
 
 private:
     // DeathRecipient interface
@@ -116,8 +113,6 @@ private:
     sp<IBinder::DeathRecipient> mDeathObserver;
 #endif
     const String16 mOpPackageName;
-    std::unordered_map<int, sp<ISensorEventConnection>> mDirectConnection;
-    int32_t mDirectConnectionHandle;
 };
 
 // ----------------------------------------------------------------------------
