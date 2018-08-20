@@ -274,8 +274,10 @@ void SensorService::onFirstRef() {
             mAckReceiver->run("SensorEventAckReceiver", PRIORITY_URGENT_DISPLAY);
             run("SensorService", PRIORITY_URGENT_DISPLAY);
 
+#ifndef HARDWARE_FIFO_SENSOR_SERVICE
             // priority can only be changed after run
             enableSchedFifoMode();
+#endif
         }
     }
 }

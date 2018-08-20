@@ -387,14 +387,14 @@ void DispSync::init(bool hasSyncFramework, int64_t dispSyncPresentTimeOffset) {
     mIgnorePresentFences = !hasSyncFramework;
     mPresentTimeOffset = dispSyncPresentTimeOffset;
     mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
-
+#ifndef HARDWARE_SCHED_FIFO
     // set DispSync to SCHED_FIFO to minimize jitter
     struct sched_param param = {0};
     param.sched_priority = 2;
     if (sched_setscheduler(mThread->getTid(), SCHED_FIFO, &param) != 0) {
         ALOGE("Couldn't set SCHED_FIFO for DispSyncThread");
     }
-
+#endif
     android_set_rt_ioprio(mThread->getTid(), 1);
 
     reset();
