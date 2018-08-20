@@ -75,7 +75,6 @@ private:
     virtual status_t setEventRate(int handle, nsecs_t samplingPeriodNs);
     virtual status_t flush();
     virtual int32_t configureChannel(int handle, int rateLevel);
-    virtual void destroy();
 
     // Count the number of flush complete events which are about to be dropped in the buffer.
     // Increment mPendingFlushEventsToSend in mSensorInfo. These flush complete events will be sent
@@ -165,8 +164,6 @@ private:
     int mTotalAcksNeeded, mTotalAcksReceived;
 #endif
 
-    mutable Mutex mDestroyLock;
-    bool mDestroyed;
 };
 
 } // namepsace android
