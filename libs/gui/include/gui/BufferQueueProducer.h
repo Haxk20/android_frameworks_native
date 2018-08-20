@@ -183,6 +183,9 @@ public:
     // See IGraphicBufferProducer::getUniqueId
     virtual status_t getUniqueId(uint64_t* outId) const override;
 
+    // See IGraphicBufferProducer::getConsumerUsage
+    virtual status_t getConsumerUsage(uint32_t* outUsage) const override;
+
 private:
     // This is required by the IBinder::DeathRecipient interface
     virtual void binderDied(const wp<IBinder>& who);

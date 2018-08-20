@@ -1564,4 +1564,12 @@ status_t BufferQueueProducer::getUniqueId(uint64_t* outId) const {
     return NO_ERROR;
 }
 
+status_t BufferQueueProducer::getConsumerUsage(uint32_t* outUsage) const {
+    BQ_LOGV("getConsumerUsage");
+
+    Mutex::Autolock lock(mCore->mMutex);
+    *outUsage = mCore->mConsumerUsageBits;
+    return NO_ERROR;
+}
+
 } // namespace android

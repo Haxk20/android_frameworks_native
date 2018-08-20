@@ -94,6 +94,7 @@ struct H2BGraphicBufferProducer : public ::android::H2BConverter<
           sp<Fence>* outFence, float outTransformMatrix[16]) override;
     void getFrameTimestamps(FrameEventHistoryDelta* outDelta) override;
     status_t getUniqueId(uint64_t* outId) const override;
+    status_t getConsumerUsage(uint32_t* outUsage) const override;
 };
 
 }  // namespace utils

@@ -21,6 +21,8 @@
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <gui/bufferqueue/1.0/B2HProducerListener.h>
 
+#include <system/window.h>
+
 namespace android {
 namespace hardware {
 namespace graphics {
@@ -1229,6 +1231,18 @@ status_t H2BGraphicBufferProducer::getUniqueId(uint64_t* outId) const {
                 *outId = id;
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
+}
+
+status_t H2BGraphicBufferProducer::getConsumerUsage(uint32_t* outUsage) const {
+    ALOGW("getConsumerUsage is not fully supported");
+    int result;
+    status_t transStatus = toStatusT(mBase->query(
+            NATIVE_WINDOW_CONSUMER_USAGE_BITS,
+            [&result, outUsage] (int32_t tResult, int32_t tValue) {
+                result = static_cast<int>(tResult);
+                *outUsage = static_cast<uint32_t>(tValue);
+            }));
+    return transStatus == NO_ERROR ? result : static_cast<int>(transStatus);
 }
 
 }  // namespace utils
