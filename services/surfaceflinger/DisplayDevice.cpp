@@ -197,9 +197,11 @@ DisplayDevice::DisplayDevice(
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
 
+#ifndef STE_HARDWARE
     if (useTripleFramebuffer) {
         surface->allocateBuffers();
     }
+#endif
 }
 
 DisplayDevice::~DisplayDevice() {
