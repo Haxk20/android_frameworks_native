@@ -30,6 +30,9 @@
 
 #include <ui/DisplayInfo.h>
 #include <ui/PixelFormat.h>
+#ifdef STE_HARDWARE
+#include <ui/FramebufferNativeWindow.h>
+#endif
 
 #include <gui/Surface.h>
 
@@ -117,8 +120,12 @@ DisplayDevice::DisplayDevice(
 {
     // clang-format on
     Surface* surface;
+#ifdef STE_HARDWARE
+    ANativeWindow* const window = new FramebufferNativeWindow();
+#else
     mNativeWindow = surface = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
+#endif
 
 #ifdef USE_HWC2
     mActiveColorMode = HAL_COLOR_MODE_NATIVE;
@@ -525,7 +532,12 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
+#ifdef STE_HARDWARE
+    ANativeWindow* const window = new FramebufferNativeWindow();
+#else
+    mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
+#endif
     mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
     eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
     eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);
@@ -639,11 +651,11 @@ void DisplayDevice::dump(String8& result) const {
     eglGetConfigAttrib(mDisplay, mConfig, EGL_BLUE_SIZE, &blueSize);
     eglGetConfigAttrib(mDisplay, mConfig, EGL_ALPHA_SIZE, &alphaSize);
     result.appendFormat("+ DisplayDevice: %s\n", mDisplayName.string());
-    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p "
+    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d),"
                         "(%d:%d:%d:%d), orient=%2d (type=%08x), "
                         "flips=%u, isSecure=%d, powerMode=%d, activeConfig=%d, numLayers=%zu\n",
                         mType, mHwcDisplayId, mLayerStack, mDisplayWidth, mDisplayHeight,
-                        mNativeWindow.get(), redSize, greenSize, blueSize, alphaSize, mOrientation,
+                        redSize, greenSize, blueSize, alphaSize, mOrientation,
                         tr.getType(), getPageFlipCount(), mIsSecure, mPowerMode, mActiveConfig,
                         mVisibleLayersSortedByZ.size());
     result.appendFormat("   v:[%d,%d,%d,%d], f:[%d,%d,%d,%d], s:[%d,%d,%d,%d],"

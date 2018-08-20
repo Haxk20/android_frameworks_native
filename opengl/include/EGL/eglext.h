@@ -1266,6 +1266,7 @@ EGLAPI EGLBoolean EGLAPIENTRY eglGetSyncAttribNV (EGLSyncNV sync, EGLint attribu
 #endif /* KHRONOS_SUPPORT_INT64 */
 #endif /* EGL_NV_sync */
 
+#ifndef STE_HARDWARE
 #ifndef EGL_NV_system_time
 #define EGL_NV_system_time 1
 typedef khronos_utime_nanoseconds_t EGLuint64NV;
@@ -1278,6 +1279,7 @@ EGLAPI EGLuint64NV EGLAPIENTRY eglGetSystemTimeNV (void);
 #endif
 #endif /* KHRONOS_SUPPORT_INT64 */
 #endif /* EGL_NV_system_time */
+#endif
 
 #ifndef EGL_TIZEN_image_native_buffer
 #define EGL_TIZEN_image_native_buffer 1
