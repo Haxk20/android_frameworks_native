@@ -356,6 +356,30 @@ bool AHardwareBuffer_isValidPixelFormat(uint32_t format) {
             "HAL and AHardwareBuffer pixel format don't match");
     static_assert(HAL_PIXEL_FORMAT_YCBCR_422_I == AHARDWAREBUFFER_FORMAT_YCbCr_422_I,
             "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCbCr_422_P == AHARDWAREBUFFER_FORMAT_YCbCr_422_P,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCbCr_420_P == AHARDWAREBUFFER_FORMAT_YCbCr_420_P,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCbCr_420_I == AHARDWAREBUFFER_FORMAT_YCbCr_420_I,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_CbYCrY_422_I == AHARDWAREBUFFER_FORMAT_CbYCrY_422_I,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_CbYCrY_420_I == AHARDWAREBUFFER_FORMAT_CbYCrY_420_I,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED == AHARDWAREBUFFER_FORMAT_YCbCr_420_SP_TILED,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCbCr_420_SP == AHARDWAREBUFFER_FORMAT_YCbCr_420_SP,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCrCb_420_SP_TILED == AHARDWAREBUFFER_FORMAT_YCrCb_420_SP_TILED,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCrCb_422_SP == AHARDWAREBUFFER_FORMAT_YCrCb_422_SP,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCrCb_422_P == AHARDWAREBUFFER_FORMAT_YCrCb_422_P,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCrCb_420_P == AHARDWAREBUFFER_FORMAT_YCrCb_420_P,
+            "HAL and AHardwareBuffer pixel format don't match");
+    static_assert(HAL_PIXEL_FORMAT_YCBCR42XMBN == AHARDWAREBUFFER_FORMAT_YCBCR42XMBN,
+            "HAL and AHardwareBuffer pixel format don't match");
 
     switch (format) {
         case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
@@ -385,6 +409,19 @@ bool AHardwareBuffer_isValidPixelFormat(uint32_t format) {
         case AHARDWAREBUFFER_FORMAT_YCbCr_422_SP:
         case AHARDWAREBUFFER_FORMAT_YCrCb_420_SP:
         case AHARDWAREBUFFER_FORMAT_YCbCr_422_I:
+        case AHARDWAREBUFFER_FORMAT_YCbCr_422_P:
+        case AHARDWAREBUFFER_FORMAT_YCbCr_420_P:
+        case AHARDWAREBUFFER_FORMAT_YCbCr_420_I:
+        case AHARDWAREBUFFER_FORMAT_CbYCrY_422_I:
+        case AHARDWAREBUFFER_FORMAT_CbYCrY_420_I:
+        case AHARDWAREBUFFER_FORMAT_YCbCr_420_SP_TILED:
+        case AHARDWAREBUFFER_FORMAT_YCbCr_420_SP:
+        case AHARDWAREBUFFER_FORMAT_YCrCb_420_SP_TILED:
+        case AHARDWAREBUFFER_FORMAT_YCrCb_422_SP:
+        case AHARDWAREBUFFER_FORMAT_YCrCb_422_P:
+        case AHARDWAREBUFFER_FORMAT_YCrCb_420_P:
+        /* STE: Added Support of YUV42XMBN, required for Copybit CC acceleration */
+        case AHARDWAREBUFFER_FORMAT_YCBCR42XMBN:
             return true;
 
         default:
