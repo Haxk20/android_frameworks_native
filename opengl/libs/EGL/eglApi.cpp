@@ -616,14 +616,14 @@ void getNativePixelFormat(EGLDisplay dpy, egl_connection_t* cnx, EGLConfig confi
     cnx->egl.eglGetConfigAttrib(dpy, config, EGL_COLOR_COMPONENT_TYPE_EXT, &componentType);
 
 #if WORKAROUND_BUG_10194508
-    int intFormat = (int)(*format);
+    int intFormat = (int)(format);
     if (!cnx->egl.eglGetConfigAttrib(dpy, config, EGL_NATIVE_VISUAL_ID,
             &intFormat)) {
         ALOGE("eglGetConfigAttrib(EGL_NATIVE_VISUAL_ID) failed: %#x",
                 eglGetError());
         format = 0;
     }
-    *format = (android_pixel_format)intFormat;
+    format = (android_pixel_format)intFormat;
 #else
     EGLint a = 0;
     EGLint r, g, b;
