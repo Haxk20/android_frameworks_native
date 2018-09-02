@@ -65,9 +65,10 @@ class String8;
 class HWComposer
 {
 public:
-    // Uses the named composer service. Valid choices for normal use
-    // are 'default' and 'vr'.
-    HWComposer(const std::string& serviceName);
+    // useVrComposer is passed to the composer HAL. When true, the composer HAL
+    // will use the vr composer service, otherwise it uses the real hardware
+    // composer.
+    HWComposer(bool useVrComposer);
 
     ~HWComposer();
 

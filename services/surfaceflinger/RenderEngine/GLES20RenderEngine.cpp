@@ -166,12 +166,12 @@ void GLES20RenderEngine::setViewportAndProjection(
         size_t vpw, size_t vph, Rect sourceCrop, size_t hwh, bool yswap,
         Transform::orientation_flags rotation) {
 
-    int32_t l = sourceCrop.left;
-    int32_t r = sourceCrop.right;
+    size_t l = sourceCrop.left;
+    size_t r = sourceCrop.right;
 
     // In GL, (0, 0) is the bottom-left corner, so flip y coordinates
-    int32_t t = hwh - sourceCrop.top;
-    int32_t b = hwh - sourceCrop.bottom;
+    size_t t = hwh - sourceCrop.top;
+    size_t b = hwh - sourceCrop.bottom;
 
     mat4 m;
     if (yswap) {

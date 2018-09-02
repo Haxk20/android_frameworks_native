@@ -79,9 +79,10 @@ class ComposerCallback {
 class Device
 {
 public:
-    // Service name is expected to be 'default' or 'vr' for normal use.
-    // 'vr' will slightly modify the behavior of the mComposer.
-    Device(const std::string& serviceName);
+    // useVrComposer is passed to the composer HAL. When true, the composer HAL
+    // will use the vr composer service, otherwise it uses the real hardware
+    // composer.
+    Device(bool useVrComposer);
 
     void registerCallback(ComposerCallback* callback, int32_t sequenceId);
 
