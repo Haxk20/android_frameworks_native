@@ -3,7 +3,6 @@ cc_library {
     name: "libETC1",
     srcs: ["ETC1/etc1.cpp"],
     host_supported: true,
-    cflags: ["-Wall", "-Werror"],
 
     target: {
         android: {
@@ -17,7 +16,7 @@ cc_library {
             },
         },
         windows: {
-            enabled: true,
+            enabled: false,
         },
     },
 }
@@ -57,9 +56,6 @@ cc_defaults {
         "-DGL_GLEXT_PROTOTYPES",
         "-DEGL_EGLEXT_PROTOTYPES",
         "-fvisibility=hidden",
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-variable",
     ],
     shared_libs: [
         // ***** DO NOT ADD NEW DEPENDENCIES HERE *****
@@ -91,11 +87,6 @@ cc_defaults {
     defaults: ["gl_libs_defaults"],
     cflags: [
         "-DLOG_TAG=\"libEGL\"",
-        "-Wall",
-        "-Werror",
-        "-Wno-error=deprecated-register",
-        "-Wno-error=unknown-attributes",
-        "-Wno-unused-variable",
     ],
     shared_libs: [
         // ***** DO NOT ADD NEW DEPENDENCIES HERE *****
