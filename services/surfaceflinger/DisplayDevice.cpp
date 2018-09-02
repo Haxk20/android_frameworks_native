@@ -34,6 +34,9 @@
 #include <ui/DebugUtils.h>
 #include <ui/DisplayInfo.h>
 #include <ui/PixelFormat.h>
+#ifdef STE_HARDWARE
+#include <ui/FramebufferNativeWindow.h>
+#endif
 
 #include <gui/Surface.h>
 
@@ -546,10 +549,18 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
+//#ifdef STE_HARDWARE
+//    ANativeWindow* const window = new FramebufferNativeWindow();
+//#else
+    mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
     mSurface->setNativeWindow(window);
-    mDisplayWidth = mSurface->queryWidth();
-    mDisplayHeight = mSurface->queryHeight();
+//#endif
+    mDisplayWidth = 480; //mSurface->queryWidth();
+    mDisplayHeight = 800; //mSurface->queryHeight();
+    mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
+    eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
+    eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);
 
     LOG_FATAL_IF(mDisplayWidth != newWidth,
                 "Unable to set new width to %d", newWidth);
