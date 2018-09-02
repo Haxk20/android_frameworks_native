@@ -70,7 +70,7 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client,
     :   contentDirty(false),
         sequence(uint32_t(android_atomic_inc(&sSequence))),
         mFlinger(flinger),
-        mTextureName(UINT32_MAX),
+        mTextureName(-1U),
         mPremultipliedAlpha(true),
         mName("unnamed"),
         mFormat(PIXEL_FORMAT_NONE),
@@ -217,6 +217,9 @@ Layer::~Layer() {
 
 #ifdef USE_HWC2
 void Layer::onLayerDisplayed(const sp<Fence>& releaseFence) {
+    if (mHwcLayers.empty()) {
+        return;
+    }
     mSurfaceFlingerConsumer->setReleaseFence(releaseFence);
 }
 #else
@@ -392,9 +395,9 @@ bool Layer::createHwcLayer(HWComposer* hwc, int32_t hwcId) {
     return true;
 }
 
-bool Layer::destroyHwcLayer(int32_t hwcId) {
+void Layer::destroyHwcLayer(int32_t hwcId) {
     if (mHwcLayers.count(hwcId) == 0) {
-        return false;
+        return;
     }
     auto& hwcInfo = mHwcLayers[hwcId];
     LOG_ALWAYS_FATAL_IF(hwcInfo.layer == nullptr,
@@ -405,8 +408,6 @@ bool Layer::destroyHwcLayer(int32_t hwcId) {
     // mHwcLayers. Verify that.
     LOG_ALWAYS_FATAL_IF(mHwcLayers.count(hwcId) != 0,
             "Stale layer entry in mHwcLayers");
-
-    return true;
 }
 
 void Layer::destroyAllHwcLayers() {
@@ -447,14 +448,6 @@ static Rect reduce(const Rect& win, const Region& exclude) {
     return Region(win).subtract(exclude).getBounds();
 }
 
-static FloatRect reduce(const FloatRect& win, const Region& exclude) {
-    if (CC_LIKELY(exclude.isEmpty())) {
-        return win;
-    }
-    // Convert through Rect (by rounding) for lack of FloatRegion
-    return Region(Rect{win}).subtract(exclude).getBounds().toFloatRect();
-}
-
 Rect Layer::computeScreenBounds(bool reduceTransparentRegion) const {
     const Layer::State& s(getDrawingState());
     Rect win(s.active.w, s.active.h);
@@ -493,12 +486,12 @@ Rect Layer::computeScreenBounds(bool reduceTransparentRegion) const {
     return win;
 }
 
-FloatRect Layer::computeBounds() const {
+Rect Layer::computeBounds() const {
     const Layer::State& s(getDrawingState());
     return computeBounds(s.activeTransparentRegion);
 }
 
-FloatRect Layer::computeBounds(const Region& activeTransparentRegion) const {
+Rect Layer::computeBounds(const Region& activeTransparentRegion) const {
     const Layer::State& s(getDrawingState());
     Rect win(s.active.w, s.active.h);
 
@@ -515,16 +508,14 @@ FloatRect Layer::computeBounds(const Region& activeTransparentRegion) const {
     }
 
     Transform t = getTransform();
-
-    FloatRect floatWin = win.toFloatRect();
     if (p != nullptr) {
-        floatWin = t.transform(floatWin);
-        floatWin = floatWin.intersect(bounds.toFloatRect());
-        floatWin = t.inverse().transform(floatWin);
+        win = t.transform(win);
+        win.intersect(bounds, &win);
+        win = t.inverse().transform(win);
     }
 
     // subtract the transparent region and snap to the bounds
-    return reduce(floatWin, activeTransparentRegion);
+    return reduce(win, activeTransparentRegion);
 }
 
 Rect Layer::computeInitialCrop(const sp<const DisplayDevice>& hw) const {
@@ -733,9 +724,7 @@ void Layer::setGeometry(
                 s.active.w, activeCrop.bottom));
     }
 
-    // computeBounds returns a FloatRect to provide more accuracy during the
-    // transformation. We then round upon constructing 'frame'.
-    Rect frame{t.transform(computeBounds(activeTransparentRegion))};
+    Rect frame(t.transform(computeBounds(activeTransparentRegion)));
     if (!s.finalCrop.isEmpty()) {
         if(!frame.intersect(s.finalCrop, &frame)) {
             frame.clear();
@@ -1237,17 +1226,16 @@ void Layer::drawWithOpenGL(const sp<const DisplayDevice>& hw,
      * minimal value)? Or, we could make GL behave like HWC -- but this feel
      * like more of a hack.
      */
-    const Rect bounds{computeBounds()}; // Rounds from FloatRect
+    Rect win(computeBounds());
 
     Transform t = getTransform();
-    Rect win = bounds;
     if (!s.finalCrop.isEmpty()) {
         win = t.transform(win);
         if (!win.intersect(s.finalCrop, &win)) {
             win.clear();
         }
         win = t.inverse().transform(win);
-        if (!win.intersect(bounds, &win)) {
+        if (!win.intersect(computeBounds(), &win)) {
             win.clear();
         }
     }
@@ -1453,7 +1441,7 @@ void Layer::computeGeometry(const sp<const DisplayDevice>& hw, Mesh& mesh,
     const Layer::State& s(getDrawingState());
     const Transform hwTransform(hw->getTransform());
     const uint32_t hw_h = hw->getHeight();
-    FloatRect win = computeBounds();
+    Rect win = computeBounds();
 
     vec2 lt = vec2(win.left, win.top);
     vec2 lb = vec2(win.left, win.bottom);
@@ -2672,7 +2660,6 @@ int32_t Layer::getZ() const {
     return mDrawingState.z;
 }
 
-__attribute__((no_sanitize("unsigned-integer-overflow")))
 LayerVector Layer::makeTraversalList(LayerVector::StateSet stateSet) {
     LOG_ALWAYS_FATAL_IF(stateSet == LayerVector::StateSet::Invalid,
                         "makeTraversalList received invalid stateSet");
@@ -2728,7 +2715,7 @@ void Layer::traverseInReverseZOrder(LayerVector::StateSet stateSet,
     LayerVector list = makeTraversalList(stateSet);
 
     int32_t i = 0;
-    for (i = int32_t(list.size()) - 1; i >= 0; i--) {
+    for (i = list.size()-1; i>=0; i--) {
         const auto& relative = list[i];
         if (relative->getZ() < 0) {
             break;
