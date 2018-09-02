@@ -187,10 +187,10 @@ public:
 
     virtual status_t detachNextBuffer(sp<GraphicBuffer>* outBuffer,
             sp<Fence>* outFence) {
-        if (outBuffer == nullptr) {
+        if (outBuffer == NULL) {
             ALOGE("detachNextBuffer: outBuffer must not be NULL");
             return BAD_VALUE;
-        } else if (outFence == nullptr) {
+        } else if (outFence == NULL) {
             ALOGE("detachNextBuffer: outFence must not be NULL");
             return BAD_VALUE;
         }
@@ -298,7 +298,7 @@ public:
             int api, bool producerControlledByApp, QueueBufferOutput* output) {
         Parcel data, reply;
         data.writeInterfaceToken(IGraphicBufferProducer::getInterfaceDescriptor());
-        if (listener != nullptr) {
+        if (listener != NULL) {
             data.writeInt32(1);
             data.writeStrongBinder(IInterface::asBinder(listener));
         } else {
@@ -662,8 +662,8 @@ status_t BnGraphicBufferProducer::onTransact(
             int bufferIdx   = data.readInt32();
             sp<GraphicBuffer> buffer;
             int result = requestBuffer(bufferIdx, &buffer);
-            reply->writeInt32(buffer != nullptr);
-            if (buffer != nullptr) {
+            reply->writeInt32(buffer != 0);
+            if (buffer != 0) {
                 reply->write(*buffer);
             }
             reply->writeInt32(result);
@@ -721,12 +721,12 @@ status_t BnGraphicBufferProducer::onTransact(
             int32_t result = detachNextBuffer(&buffer, &fence);
             reply->writeInt32(result);
             if (result == NO_ERROR) {
-                reply->writeInt32(buffer != nullptr);
-                if (buffer != nullptr) {
+                reply->writeInt32(buffer != NULL);
+                if (buffer != NULL) {
                     reply->write(*buffer);
                 }
-                reply->writeInt32(fence != nullptr);
-                if (fence != nullptr) {
+                reply->writeInt32(fence != NULL);
+                if (fence != NULL) {
                     reply->write(*fence);
                 }
             }

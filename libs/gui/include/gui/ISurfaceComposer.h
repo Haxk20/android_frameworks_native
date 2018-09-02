@@ -39,7 +39,6 @@ struct ComposerState;
 struct DisplayState;
 struct DisplayInfo;
 struct DisplayStatInfo;
-class LayerDebugInfo;
 class HdrCapabilities;
 class IDisplayEventConnection;
 class IGraphicBufferProducer;
@@ -230,7 +229,6 @@ public:
         SET_ACTIVE_COLOR_MODE,
         ENABLE_VSYNC_INJECTIONS,
         INJECT_VSYNC,
-        GET_LAYER_DEBUG_INFO,
         CREATE_SCOPED_CONNECTION
     };
 

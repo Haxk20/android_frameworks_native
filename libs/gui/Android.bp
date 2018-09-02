@@ -26,10 +26,6 @@ cc_library_shared {
     double_loadable: true,
 
     clang: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     cppflags: [
         "-Weverything",
 
@@ -97,7 +93,6 @@ cc_library_shared {
         "IProducerListener.cpp",
         "ISurfaceComposer.cpp",
         "ISurfaceComposerClient.cpp",
-        "LayerDebugInfo.cpp",
         "LayerState.cpp",
         "OccupancyTracker.cpp",
         "StreamSplitter.cpp",

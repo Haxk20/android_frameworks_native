@@ -151,10 +151,7 @@ status_t Surface::getDisplayRefreshCycleDuration(nsecs_t* outRefreshDuration) {
     ATRACE_CALL();
 
     DisplayStatInfo stats;
-    status_t result = composerService()->getDisplayStats(nullptr, &stats);
-    if (result != NO_ERROR) {
-        return result;
-    }
+    //status_t err = composerService()->getDisplayStats(NULL, &stats);
 
     *outRefreshDuration = stats.vsyncPeriod;
 
@@ -492,7 +489,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
         if (mSharedBufferMode && mAutoRefresh && mSharedBufferSlot !=
                 BufferItem::INVALID_BUFFER_SLOT) {
             sp<GraphicBuffer>& gbuf(mSlots[mSharedBufferSlot].buffer);
-            if (gbuf != nullptr) {
+            if (gbuf != NULL) {
                 *buffer = gbuf.get();
                 *fenceFd = -1;
                 return OK;
@@ -532,7 +529,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
     sp<GraphicBuffer>& gbuf(mSlots[buf].buffer);
 
     // this should never happen
-    ALOGE_IF(fence == nullptr, "Surface::dequeueBuffer: received null Fence! buf=%d", buf);
+    ALOGE_IF(fence == NULL, "Surface::dequeueBuffer: received null Fence! buf=%d", buf);
 
     if (result & IGraphicBufferProducer::RELEASE_ALL_BUFFERS) {
         freeAllBuffers();
@@ -610,7 +607,7 @@ int Surface::cancelBuffer(android_native_buffer_t* buffer,
 int Surface::getSlotFromBufferLocked(
         android_native_buffer_t* buffer) const {
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (mSlots[i].buffer != nullptr &&
+        if (mSlots[i].buffer != NULL &&
                 mSlots[i].buffer->handle == buffer->handle) {
             return i;
         }
@@ -870,10 +867,6 @@ int Surface::query(int what, int* value) const {
             case NATIVE_WINDOW_FRAME_TIMESTAMPS_SUPPORTS_PRESENT: {
                 querySupportedTimestampsLocked();
                 *value = mFrameTimestampsSupportsPresent ? 1 : 0;
-                return NO_ERROR;
-            }
-            case NATIVE_WINDOW_IS_VALID: {
-                *value = mGraphicBufferProducer != nullptr ? 1 : 0;
                 return NO_ERROR;
             }
         }
@@ -1226,7 +1219,7 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
     ATRACE_CALL();
     ALOGV("Surface::detachNextBuffer");
 
-    if (outBuffer == nullptr || outFence == nullptr) {
+    if (outBuffer == NULL || outFence == NULL) {
         return BAD_VALUE;
     }
 
@@ -1235,8 +1228,8 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
         mRemovedBuffers.clear();
     }
 
-    sp<GraphicBuffer> buffer(nullptr);
-    sp<Fence> fence(nullptr);
+    sp<GraphicBuffer> buffer(NULL);
+    sp<Fence> fence(NULL);
     status_t result = mGraphicBufferProducer->detachNextBuffer(
             &buffer, &fence);
     if (result != NO_ERROR) {
@@ -1244,19 +1237,19 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
     }
 
     *outBuffer = buffer;
-    if (fence != nullptr && fence->isValid()) {
+    if (fence != NULL && fence->isValid()) {
         *outFence = fence;
     } else {
         *outFence = Fence::NO_FENCE;
     }
 
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (mSlots[i].buffer != nullptr &&
+        if (mSlots[i].buffer != NULL &&
                 mSlots[i].buffer->getId() == buffer->getId()) {
             if (mReportRemovedBuffers) {
                 mRemovedBuffers.push_back(mSlots[i].buffer);
             }
-            mSlots[i].buffer = nullptr;
+            mSlots[i].buffer = NULL;
         }
     }
 
@@ -1308,7 +1301,7 @@ int Surface::setCrop(Rect const* rect)
     ATRACE_CALL();
 
     Rect realRect(Rect::EMPTY_RECT);
-    if (rect == nullptr || rect->isEmpty()) {
+    if (rect == NULL || rect->isEmpty()) {
         realRect.clear();
     } else {
         realRect = *rect;
@@ -1505,7 +1498,7 @@ int Surface::setBuffersDataSpace(android_dataspace dataSpace)
 
 void Surface::freeAllBuffers() {
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        mSlots[i].buffer = nullptr;
+        mSlots[i].buffer = 0;
     }
 }
 
@@ -1545,12 +1538,12 @@ static status_t copyBlt(
     // src and dst with, height and format must be identical. no verification
     // is done here.
     status_t err;
-    uint8_t* src_bits = nullptr;
+    uint8_t* src_bits = NULL;
     err = src->lock(GRALLOC_USAGE_SW_READ_OFTEN, reg.bounds(),
             reinterpret_cast<void**>(&src_bits));
     ALOGE_IF(err, "error locking src buffer %s", strerror(-err));
 
-    uint8_t* dst_bits = nullptr;
+    uint8_t* dst_bits = NULL;
     err = dst->lockAsync(GRALLOC_USAGE_SW_WRITE_OFTEN, reg.bounds(),
             reinterpret_cast<void**>(&dst_bits), *dstFenceFd);
     ALOGE_IF(err, "error locking dst buffer %s", strerror(-err));
@@ -1598,7 +1591,7 @@ static status_t copyBlt(
 status_t Surface::lock(
         ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds)
 {
-    if (mLockedBuffer != nullptr) {
+    if (mLockedBuffer != 0) {
         ALOGE("Surface::lock failed, already locked");
         return INVALID_OPERATION;
     }
@@ -1630,7 +1623,7 @@ status_t Surface::lock(
 
         // figure out if we can copy the frontbuffer back
         const sp<GraphicBuffer>& frontBuffer(mPostedBuffer);
-        const bool canCopyBack = (frontBuffer != nullptr &&
+        const bool canCopyBack = (frontBuffer != 0 &&
                 backBuffer->width  == frontBuffer->width &&
                 backBuffer->height == frontBuffer->height &&
                 backBuffer->format == frontBuffer->format);
@@ -1692,7 +1685,7 @@ status_t Surface::lock(
 
 status_t Surface::unlockAndPost()
 {
-    if (mLockedBuffer == nullptr) {
+    if (mLockedBuffer == 0) {
         ALOGE("Surface::unlockAndPost failed, no locked buffer");
         return INVALID_OPERATION;
     }
@@ -1706,7 +1699,7 @@ status_t Surface::unlockAndPost()
             mLockedBuffer->handle, strerror(-err));
 
     mPostedBuffer = mLockedBuffer;
-    mLockedBuffer = nullptr;
+    mLockedBuffer = 0;
     return err;
 }
 
