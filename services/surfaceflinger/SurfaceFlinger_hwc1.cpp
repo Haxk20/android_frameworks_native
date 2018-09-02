@@ -28,6 +28,7 @@
 
 #include <EGL/egl.h>
 
+#include <bfqio/bfqio.h>
 #include <cutils/properties.h>
 #include <log/log.h>
 
@@ -41,7 +42,6 @@
 #include <gui/BufferQueue.h>
 #include <gui/GuiConfig.h>
 #include <gui/IDisplayEventConnection.h>
-#include <gui/LayerDebugInfo.h>
 #include <gui/Surface.h>
 
 #include <ui/GraphicBufferAllocator.h>
@@ -607,6 +607,7 @@ void SurfaceFlinger::init() {
 
     mEventControlThread = new EventControlThread(this);
     mEventControlThread->run("EventControl", PRIORITY_URGENT_DISPLAY);
+    android_set_rt_ioprio(mEventControlThread->getTid(), 1);
 
     // set a fake vsync period if there is no HWComposer
     if (mHwc->initCheck() != NO_ERROR) {
@@ -958,34 +959,6 @@ status_t SurfaceFlinger::injectVSync(nsecs_t when) {
         ALOGV("Injecting VSync inside SurfaceFlinger");
         mVSyncInjector->onInjectSyncEvent(when);
     }
-    return NO_ERROR;
-}
-
-status_t SurfaceFlinger::getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayers) const {
-    IPCThreadState* ipc = IPCThreadState::self();
-    const int pid = ipc->getCallingPid();
-    const int uid = ipc->getCallingUid();
-    if ((uid != AID_SHELL) &&
-            !PermissionCache::checkPermission(sDump, pid, uid)) {
-        ALOGE("Layer debug info permission denied for pid=%d, uid=%d", pid, uid);
-        return PERMISSION_DENIED;
-    }
-
-    // Try to acquire a lock for 1s, fail gracefully
-    status_t err = mStateLock.timedLock(s2ns(1));
-    bool locked = (err == NO_ERROR);
-    if (!locked) {
-        ALOGE("LayerDebugInfo: SurfaceFlinger unresponsive (%s [%d]) - exit", strerror(-err), err);
-        return TIMED_OUT;
-    }
-
-    outLayers->clear();
-    mCurrentState.traverseInZOrder([&](Layer* layer) {
-            outLayers->push_back(layer->getLayerDebugInfo());
-        });
-
-    mStateLock.unlock();
-
     return NO_ERROR;
 }
 
@@ -3316,7 +3289,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     result.appendFormat("Visible layers (count = %zu)\n", mNumLayers);
     colorizer.reset(result);
     mCurrentState.traverseInZOrder([&](Layer* layer) {
-        result.append(to_string(layer->getLayerDebugInfo()).c_str());
+        layer->dump(result, colorizer);
     });
 
     /*

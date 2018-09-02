@@ -196,12 +196,6 @@ public:
     virtual status_t enableVSyncInjections(bool enable) = 0;
 
     virtual status_t injectVSync(nsecs_t when) = 0;
-
-    /* Gets the list of active layers in Z order for debugging purposes
-     *
-     * Requires the ACCESS_SURFACE_FLINGER permission.
-     */
-    virtual status_t getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayers) const = 0;
 };
 
 // ----------------------------------------------------------------------------

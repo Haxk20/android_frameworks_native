@@ -313,7 +313,6 @@ private:
             HdrCapabilities* outCapabilities) const;
     virtual status_t enableVSyncInjections(bool enable);
     virtual status_t injectVSync(nsecs_t when);
-    virtual status_t getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayers) const;
 
 
     /* ------------------------------------------------------------------------
@@ -366,6 +365,9 @@ private:
 
     // Called on the main thread in response to setActiveColorMode()
     void setActiveColorModeInternal(const sp<DisplayDevice>& hw, android_color_mode_t colorMode);
+
+    // Called on the main thread in response to enableVSyncInjections()
+    void enableVSyncInjectionsInternal(bool enable);
 
     // Returns whether the transaction actually modified any state
     bool handleMessageTransaction();
@@ -483,9 +485,9 @@ private:
     // called when starting, or restarting after system_server death
     void initializeDisplays();
 
-#ifndef USE_HWC2
+    // Create an IBinder for a builtin display and add it to current state
     void createBuiltinDisplayLocked(DisplayDevice::DisplayType type);
-#endif
+
 
     sp<const DisplayDevice> getDisplayDevice(const wp<IBinder>& dpy) const {
       Mutex::Autolock _l(mStateLock);
@@ -510,6 +512,8 @@ private:
     sp<const DisplayDevice> getDefaultDisplayDeviceLocked() const {
         return getDisplayDeviceLocked(mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY]);
     }
+
+    void createDefaultDisplayDevice();
 
     int32_t getDisplayType(const sp<IBinder>& display) {
         if (!display.get()) return NAME_NOT_FOUND;
@@ -574,8 +578,6 @@ private:
     /* ------------------------------------------------------------------------
      * Display management
      */
-    void processDisplayChangesLocked();
-    void processDisplayHotplugEventsLocked();
 
     /* ------------------------------------------------------------------------
      * VSync
@@ -627,8 +629,8 @@ private:
     void updateVrFlinger();
 #endif
 
-     // Panel hardware rotation
-     int32_t mHardwareRotation;
+    // Panel hardware rotation
+    int32_t mHardwareRotation;
 
     /* ------------------------------------------------------------------------
      * Attributes
@@ -673,10 +675,6 @@ private:
     // acquiring mStateLock.
     std::unique_ptr<HWComposer> mHwc;
 
-#ifdef USE_HWC2
-    const std::string mHwcServiceName; // "default" for real use, something else for testing.
-#endif
-
     // constant members (no synchronization needed for access)
     RenderEngine* mRenderEngine;
     nsecs_t mBootTime;
@@ -707,17 +705,6 @@ private:
 #endif
     FenceTimeline mGlCompositionDoneTimeline;
     FenceTimeline mDisplayTimeline;
-
-#ifdef USE_HWC2
-    struct HotplugEvent {
-        hwc2_display_t display;
-        HWC2::Connection connection = HWC2::Connection::Invalid;
-        bool isPrimaryDisplay;
-    };
-    // protected by mStateLock
-    std::vector<HotplugEvent> mPendingHotplugEvents;
-#endif
-
 
     // this may only be written from the main thread with mStateLock held
     // it may be read from other threads with mStateLock held
@@ -833,6 +820,7 @@ private:
 #endif
 
     float mSaturation = 1.0f;
+    bool mForceNativeColorMode = false;
 };
 }; // namespace android
 

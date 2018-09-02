@@ -124,8 +124,6 @@ public:
 
     void                    setVisibleLayersSortedByZ(const Vector< sp<Layer> >& layers);
     const Vector< sp<Layer> >& getVisibleLayersSortedByZ() const;
-    void                    setLayersNeedingFences(const Vector< sp<Layer> >& layers);
-    const Vector< sp<Layer> >& getLayersNeedingFences() const;
     Region                  getDirtyRegion(bool repaintEverything) const;
 
     void                    setLayerStack(uint32_t stack);
@@ -243,8 +241,6 @@ private:
 
     // list of visible layers on that display
     Vector< sp<Layer> > mVisibleLayersSortedByZ;
-    // list of layers needing fences
-    Vector< sp<Layer> > mLayersNeedingFences;
 
     /*
      * Transaction state
