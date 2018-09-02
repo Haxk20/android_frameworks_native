@@ -2756,7 +2756,9 @@ void Parcel::initState()
     mFdsKnown = true;
     mAllowFds = true;
     mOwner = nullptr;
+#ifndef DISABLE_ASHMEM_TRACKING
     mOpenAshmemSize = 0;
+#endif
 
     // racing multiple init leads only to multiple identical write
     if (gMaxFds == 0) {
