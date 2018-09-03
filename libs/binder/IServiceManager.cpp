@@ -33,14 +33,14 @@ namespace android {
 
 sp<IServiceManager> defaultServiceManager()
 {
-    if (gDefaultServiceManager != nullptr) return gDefaultServiceManager;
+    if (gDefaultServiceManager != NULL) return gDefaultServiceManager;
 
     {
         AutoMutex _l(gDefaultServiceManagerLock);
-        while (gDefaultServiceManager == nullptr) {
+        while (gDefaultServiceManager == NULL) {
             gDefaultServiceManager = interface_cast<IServiceManager>(
-                ProcessState::self()->getContextObject(nullptr));
-            if (gDefaultServiceManager == nullptr)
+                ProcessState::self()->getContextObject(NULL));
+            if (gDefaultServiceManager == NULL)
                 sleep(1);
         }
     }
@@ -50,7 +50,7 @@ sp<IServiceManager> defaultServiceManager()
 
 bool checkCallingPermission(const String16& permission)
 {
-    return checkCallingPermission(permission, nullptr, nullptr);
+    return checkCallingPermission(permission, NULL, NULL);
 }
 
 static String16 _permission("permission");
@@ -76,7 +76,7 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
     int64_t startTime = 0;
 
     while (true) {
-        if (pc != nullptr) {
+        if (pc != NULL) {
             bool res = pc->checkPermission(permission, pid, uid);
             if (res) {
                 if (startTime != 0) {
@@ -97,14 +97,14 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
             // Object is dead!
             gDefaultServiceManagerLock.lock();
             if (gPermissionController == pc) {
-                gPermissionController = nullptr;
+                gPermissionController = NULL;
             }
             gDefaultServiceManagerLock.unlock();
         }
 
         // Need to retrieve the permission controller.
         sp<IBinder> binder = defaultServiceManager()->checkService(_permission);
-        if (binder == nullptr) {
+        if (binder == NULL) {
             // Wait for the permission controller to come back...
             if (startTime == 0) {
                 startTime = uptimeMillis();
@@ -146,9 +146,9 @@ public:
                 sleep(1);
             }
             sp<IBinder> svc = checkService(name);
-            if (svc != nullptr) return svc;
+            if (svc != NULL) return svc;
         }
-        return nullptr;
+        return NULL;
     }
 
     virtual sp<IBinder> checkService( const String16& name) const

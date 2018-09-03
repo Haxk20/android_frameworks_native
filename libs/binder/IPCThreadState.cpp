@@ -289,7 +289,7 @@ restart:
 
     if (gShutdown) {
         ALOGW("Calling IPCThreadState::self() during shutdown is dangerous, expect a crash.\n");
-        return nullptr;
+        return NULL;
     }
 
     pthread_mutex_lock(&gTLSMutex);
@@ -299,7 +299,7 @@ restart:
             pthread_mutex_unlock(&gTLSMutex);
             ALOGW("IPCThreadState::self() unable to create TLS key, expect a crash: %s\n",
                     strerror(key_create_value));
-            return nullptr;
+            return NULL;
         }
         gHaveTLS = true;
     }
@@ -314,7 +314,7 @@ IPCThreadState* IPCThreadState::selfOrNull()
         IPCThreadState* st = (IPCThreadState*)pthread_getspecific(k);
         return st;
     }
-    return nullptr;
+    return NULL;
 }
 
 void IPCThreadState::shutdown()
@@ -326,7 +326,7 @@ void IPCThreadState::shutdown()
         IPCThreadState* st = (IPCThreadState*)pthread_getspecific(gTLS);
         if (st) {
             delete st;
-            pthread_setspecific(gTLS, nullptr);
+            pthread_setspecific(gTLS, NULL);
         }
         pthread_key_delete(gTLS);
         gHaveTLS = false;
@@ -470,33 +470,22 @@ status_t IPCThreadState::getAndExecuteCommand()
 void IPCThreadState::processPendingDerefs()
 {
     if (mIn.dataPosition() >= mIn.dataSize()) {
-        /*
-         * The decWeak()/decStrong() calls may cause a destructor to run,
-         * which in turn could have initiated an outgoing transaction,
-         * which in turn could cause us to add to the pending refs
-         * vectors; so instead of simply iterating, loop until they're empty.
-         *
-         * We do this in an outer loop, because calling decStrong()
-         * may result in something being added to mPendingWeakDerefs,
-         * which could be delayed until the next incoming command
-         * from the driver if we don't process it now.
-         */
-        while (mPendingWeakDerefs.size() > 0 || mPendingStrongDerefs.size() > 0) {
-            while (mPendingWeakDerefs.size() > 0) {
-                RefBase::weakref_type* refs = mPendingWeakDerefs[0];
-                mPendingWeakDerefs.removeAt(0);
+        size_t numPending = mPendingWeakDerefs.size();
+        if (numPending > 0) {
+            for (size_t i = 0; i < numPending; i++) {
+                RefBase::weakref_type* refs = mPendingWeakDerefs[i];
                 refs->decWeak(mProcess.get());
             }
+            mPendingWeakDerefs.clear();
+        }
 
-            if (mPendingStrongDerefs.size() > 0) {
-                // We don't use while() here because we don't want to re-order
-                // strong and weak decs at all; if this decStrong() causes both a
-                // decWeak() and a decStrong() to be queued, we want to process
-                // the decWeak() first.
-                BBinder* obj = mPendingStrongDerefs[0];
-                mPendingStrongDerefs.removeAt(0);
+        numPending = mPendingStrongDerefs.size();
+        if (numPending > 0) {
+            for (size_t i = 0; i < numPending; i++) {
+                BBinder* obj = mPendingStrongDerefs[i];
                 obj->decStrong(mProcess.get());
             }
+            mPendingStrongDerefs.clear();
         }
     }
 }
@@ -571,7 +560,7 @@ status_t IPCThreadState::transact(int32_t handle,
                                   uint32_t code, const Parcel& data,
                                   Parcel* reply, uint32_t flags)
 {
-    status_t err;
+    status_t err = data.errorCheck();
 
     flags |= TF_ACCEPT_FDS;
 
@@ -582,9 +571,11 @@ status_t IPCThreadState::transact(int32_t handle,
             << indent << data << dedent << endl;
     }
 
-    LOG_ONEWAY(">>>> SEND from pid %d uid %d %s", getpid(), getuid(),
-        (flags & TF_ONE_WAY) == 0 ? "READ REPLY" : "ONE WAY");
-    err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, nullptr);
+    if (err == NO_ERROR) {
+        LOG_ONEWAY(">>>> SEND from pid %d uid %d %s", getpid(), getuid(),
+            (flags & TF_ONE_WAY) == 0 ? "READ REPLY" : "ONE WAY");
+        err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, NULL);
+    }
 
     if (err != NO_ERROR) {
         if (reply) reply->setError(err);
@@ -621,7 +612,7 @@ status_t IPCThreadState::transact(int32_t handle,
             else alog << "(none requested)" << endl;
         }
     } else {
-        err = waitForResponse(nullptr, nullptr);
+        err = waitForResponse(NULL, NULL);
     }
 
     return err;
@@ -684,7 +675,7 @@ void IPCThreadState::expungeHandle(int32_t handle, IBinder* binder)
 #if LOG_REFCOUNTS
     ALOGV("IPCThreadState::expungeHandle(%ld)\n", handle);
 #endif
-    self()->mProcess->expungeHandle(handle, binder); // NOLINT
+    self()->mProcess->expungeHandle(handle, binder);
 }
 
 status_t IPCThreadState::requestDeathNotification(int32_t handle, BpBinder* proxy)
@@ -725,7 +716,7 @@ status_t IPCThreadState::sendReply(const Parcel& reply, uint32_t flags)
     err = writeTransactionData(BC_REPLY, flags, -1, 0, reply, &statusBuffer);
     if (err < NO_ERROR) return err;
 
-    return waitForResponse(nullptr, nullptr);
+    return waitForResponse(NULL, NULL);
 }
 
 status_t IPCThreadState::waitForResponse(Parcel *reply, status_t *acquireResult)
@@ -785,14 +776,14 @@ status_t IPCThreadState::waitForResponse(Parcel *reply, status_t *acquireResult)
                             freeBuffer, this);
                     } else {
                         err = *reinterpret_cast<const status_t*>(tr.data.ptr.buffer);
-                        freeBuffer(nullptr,
+                        freeBuffer(NULL,
                             reinterpret_cast<const uint8_t*>(tr.data.ptr.buffer),
                             tr.data_size,
                             reinterpret_cast<const binder_size_t*>(tr.data.ptr.offsets),
                             tr.offsets_size/sizeof(binder_size_t), this);
                     }
                 } else {
-                    freeBuffer(nullptr,
+                    freeBuffer(NULL,
                         reinterpret_cast<const uint8_t*>(tr.data.ptr.buffer),
                         tr.data_size,
                         reinterpret_cast<const binder_size_t*>(tr.data.ptr.offsets),
@@ -1185,7 +1176,7 @@ void IPCThreadState::freeBuffer(Parcel* parcel, const uint8_t* data,
         alog << "Writing BC_FREE_BUFFER for " << data << endl;
     }
     ALOG_ASSERT(data != NULL, "Called with NULL data");
-    if (parcel != nullptr) parcel->closeFileDescriptors();
+    if (parcel != NULL) parcel->closeFileDescriptors();
     IPCThreadState* state = self();
     state->mOut.writeInt32(BC_FREE_BUFFER);
     state->mOut.writePointer((uintptr_t)data);

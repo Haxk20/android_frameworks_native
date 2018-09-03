@@ -82,6 +82,7 @@ cc_library {
         "-Wall",
         "-Wextra",
         "-DDISABLE_ASHMEM_TRACKING",
+        "-DSTE_HARDWARE",
     ],
     product_variables: {
         binder32bit: {
@@ -118,5 +119,3 @@ filegroup {
         "aidl/android/content/pm/IPackageManagerNative.aidl",
     ],
 }
-
-subdirs = ["tests"]
