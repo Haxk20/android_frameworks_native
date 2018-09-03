@@ -13,6 +13,9 @@
 
 #include "binder.h"
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 #ifdef VENDORSERVICEMANAGER
 #define LOG_TAG "VendorServiceManager"
 #else
