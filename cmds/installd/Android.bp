@@ -1,9 +1,6 @@
 cc_defaults {
     name: "installd_defaults",
 
-    cflags: [
-        "-Wall",
-    ],
     srcs: [
         "CacheItem.cpp",
         "CacheTracker.cpp",

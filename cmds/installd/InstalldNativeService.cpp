@@ -243,11 +243,13 @@ status_t InstalldNativeService::dump(int fd, const Vector<String16> & /* args */
  */
 static int restorecon_app_data_lazy(const std::string& path, const std::string& seInfo, uid_t uid,
         bool existing) {
+    (void)path; (void)seInfo; (void)uid; (void)existing;
     return 0;
 }
 
 static int restorecon_app_data_lazy(const std::string& parent, const char* name,
         const std::string& seInfo, uid_t uid, bool existing) {
+    (void)parent; (void)name; (void)seInfo; (void)uid; (void)existing;
     return 0;
 }
 
