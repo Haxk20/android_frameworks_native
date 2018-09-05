@@ -359,10 +359,10 @@ void SurfaceFlinger::bootFinished()
 
 void SurfaceFlinger::deleteTextureAsync(uint32_t texture) {
     class MessageDestroyGLTexture : public MessageBase {
-        RenderEngine& engine;
+        RE::RenderEngine& engine;
         uint32_t texture;
     public:
-        MessageDestroyGLTexture(RenderEngine& engine, uint32_t texture)
+        MessageDestroyGLTexture(RE::RenderEngine& engine, uint32_t texture)
             : engine(engine), texture(texture) {
         }
         virtual bool handler() {
@@ -550,7 +550,7 @@ void SurfaceFlinger::init() {
             *static_cast<HWComposer::EventHandler *>(this)));
 
     // get a RenderEngine for the given display / config (can't fail)
-    getBE().mRenderEngine = RenderEngine::create(mEGLDisplay,
+    getBE().mRenderEngine = RE::impl::RenderEngine::create(mEGLDisplay,
             getBE().mHwc->getVisualID(), 0);
 
     // retrieve the EGL context that was selected/created
@@ -1197,7 +1197,7 @@ void SurfaceFlinger::doDebugFlashRegions()
 
                 // and draw the dirty region
                 const int32_t height = hw->getHeight();
-                RenderEngine& engine(getRenderEngine());
+                auto& engine(getRenderEngine());
                 engine.fillRegionWithColor(dirtyRegion, height, 1, 0, 1, 1);
 
                 hw->compositionComplete();
@@ -2200,7 +2200,7 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
     if (CC_LIKELY(!mDaltonize && !mHasColorMatrix)) {
         if (!doComposeSurfaces(hw, dirtyRegion)) return;
     } else {
-        RenderEngine& engine(getRenderEngine());
+        auto& engine(getRenderEngine());
         mat4 colorMatrix = mColorMatrix;
         if (mDaltonize) {
             colorMatrix = colorMatrix * mDaltonizer();
@@ -2221,7 +2221,7 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 {
     DisplayRenderArea renderArea(hw);
 
-    RenderEngine& engine(getRenderEngine());
+    auto& engine(getRenderEngine());
     const int32_t id = hw->getHwcDisplayId();
     HWComposer& hwc(getHwComposer());
     HWComposer::LayerListIterator cur = hwc.begin(id);
@@ -2349,7 +2349,7 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 
 void SurfaceFlinger::drawWormhole(const sp<const DisplayDevice>& hw, const Region& region) const {
     const int32_t height = hw->getHeight();
-    RenderEngine& engine(getRenderEngine());
+    auto& engine(getRenderEngine());
     engine.fillRegionWithColor(region, height, 0, 0, 0, 0);
 }
 
@@ -3921,7 +3921,7 @@ void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea, Traver
         bool yswap, bool useIdentityTransform)
 {
     ATRACE_CALL();
-    RenderEngine& engine(getRenderEngine());
+    auto& engine(getRenderEngine());
 
     // get screen geometry
     const auto raWidth = renderArea.getWidth();
@@ -4027,7 +4027,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(const RenderArea& renderArea,
                 if (image != EGL_NO_IMAGE_KHR) {
                     // this binds the given EGLImage as a framebuffer for the
                     // duration of this scope.
-                    RenderEngine::BindImageAsFramebuffer imageBond(getRenderEngine(), image);
+                    RE::RenderEngine::BindImageAsFramebuffer imageBond(getRenderEngine(), image);
                     if (imageBond.getStatus() == NO_ERROR) {
                         // this will in fact render into our dequeued buffer
                         // via an FBO, which means we didn't have to create
