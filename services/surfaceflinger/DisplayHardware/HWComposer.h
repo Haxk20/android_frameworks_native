@@ -17,6 +17,10 @@
 #ifndef ANDROID_SF_HWCOMPOSER_H
 #define ANDROID_SF_HWCOMPOSER_H
 
+#ifndef USE_HWC2
+#include "HWComposer_hwc1.h"
+#else
+
 #include "HWC2.h"
 
 #include <stdint.h>
@@ -236,4 +240,5 @@ private:
 // ---------------------------------------------------------------------------
 }; // namespace android
 
+#endif // #ifdef USE_HWC2
 #endif // ANDROID_SF_HWCOMPOSER_H
