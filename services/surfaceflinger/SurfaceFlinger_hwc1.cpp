@@ -130,6 +130,9 @@ std::string getHwcServiceName() {
 SurfaceFlingerBE::SurfaceFlingerBE()
       : mHwcServiceName(getHwcServiceName()),
         mRenderEngine(nullptr),
+        mFrameBuckets(),
+        mTotalTime(0),
+        mLastSwapTime(0),
         mComposerSequenceId(0) {
 }
 
@@ -160,9 +163,6 @@ SurfaceFlinger::SurfaceFlinger()
         mHWVsyncAvailable(false),
         mDaltonize(false),
         mHasPoweredOff(false),
-        mFrameBuckets(),
-        mTotalTime(0),
-        mLastSwapTime(0),
         mNumLayers(0)
 {
     ALOGI("SurfaceFlinger is starting");
@@ -1070,7 +1070,7 @@ void SurfaceFlinger::disableHardwareVsync(bool makeUnavailable) {
 
 void SurfaceFlinger::resyncWithRateLimit() {
     static constexpr nsecs_t kIgnoreDelay = ms2ns(500);
-    if (systemTime() - mLastSwapTime > kIgnoreDelay) {
+    if (systemTime() - getBE().mLastSwapTime > kIgnoreDelay) {
         resyncToHardwareVsync(false);
     }
 }
@@ -1374,16 +1374,16 @@ void SurfaceFlinger::postComposition(nsecs_t refreshStartTime)
         mHasPoweredOff = false;
     } else {
         nsecs_t period = mPrimaryDispSync.getPeriod();
-        nsecs_t elapsedTime = currentTime - mLastSwapTime;
+        nsecs_t elapsedTime = currentTime - getBE().mLastSwapTime;
         size_t numPeriods = static_cast<size_t>(elapsedTime / period);
         if (numPeriods < NUM_BUCKETS - 1) {
-            mFrameBuckets[numPeriods] += elapsedTime;
+            getBE().mFrameBuckets[numPeriods] += elapsedTime;
         } else {
-            mFrameBuckets[NUM_BUCKETS - 1] += elapsedTime;
+            getBE().mFrameBuckets[NUM_BUCKETS - 1] += elapsedTime;
         }
-        mTotalTime += elapsedTime;
+        getBE().mTotalTime += elapsedTime;
     }
-    mLastSwapTime = currentTime;
+    getBE().mLastSwapTime = currentTime;
 }
 
 void SurfaceFlinger::rebuildLayerStacks() {
@@ -3192,15 +3192,15 @@ void SurfaceFlinger::dumpStaticScreenStats(String8& result) const
 {
     result.appendFormat("Static screen stats:\n");
     for (size_t b = 0; b < NUM_BUCKETS - 1; ++b) {
-        float bucketTimeSec = mFrameBuckets[b] / 1e9;
+        float bucketTimeSec = getBE().mFrameBuckets[b] / 1e9;
         float percent = 100.0f *
-                static_cast<float>(mFrameBuckets[b]) / mTotalTime;
+                static_cast<float>(getBE().mFrameBuckets[b]) / getBE().mTotalTime;
         result.appendFormat("  < %zd frames: %.3f s (%.1f%%)\n",
                 b + 1, bucketTimeSec, percent);
     }
-    float bucketTimeSec = mFrameBuckets[NUM_BUCKETS - 1] / 1e9;
+    float bucketTimeSec = getBE().mFrameBuckets[NUM_BUCKETS - 1] / 1e9;
     float percent = 100.0f *
-            static_cast<float>(mFrameBuckets[NUM_BUCKETS - 1]) / mTotalTime;
+            static_cast<float>(getBE().mFrameBuckets[NUM_BUCKETS - 1]) / getBE().mTotalTime;
     result.appendFormat("  %zd+ frames: %.3f s (%.1f%%)\n",
             NUM_BUCKETS - 1, bucketTimeSec, percent);
 }
