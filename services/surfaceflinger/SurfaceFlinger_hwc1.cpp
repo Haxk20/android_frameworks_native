@@ -120,6 +120,10 @@ uint64_t SurfaceFlinger::maxVirtualDisplaySize;
 bool SurfaceFlinger::hasSyncFramework;
 int64_t SurfaceFlinger::maxFrameBufferAcquiredBuffers;
 
+SurfaceFlingerBE::SurfaceFlingerBE()
+    : mComposerSequenceId(0) {
+}
+
 SurfaceFlinger::SurfaceFlinger()
     :   BnSurfaceComposer(),
         mTransactionFlags(0),
@@ -536,12 +540,12 @@ void SurfaceFlinger::init() {
 
     // Initialize the H/W composer object.  There may or may not be an
     // actual hardware composer underneath.
-    mHwc.reset(new HWComposer(this,
+    getBE().mHwc.reset(new HWComposer(this,
             *static_cast<HWComposer::EventHandler *>(this)));
 
     // get a RenderEngine for the given display / config (can't fail)
     mRenderEngine = RenderEngine::create(mEGLDisplay,
-            mHwc->getVisualID(), 0);
+            getBE().mHwc->getVisualID(), 0);
 
     // retrieve the EGL context that was selected/created
     mEGLContext = mRenderEngine->getEGLContext();
@@ -553,7 +557,7 @@ void SurfaceFlinger::init() {
     for (size_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
         DisplayDevice::DisplayType type((DisplayDevice::DisplayType)i);
         // set-up the displays that are already connected
-        if (mHwc->isConnected(i) || type==DisplayDevice::DISPLAY_PRIMARY) {
+        if (getBE().mHwc->isConnected(i) || type==DisplayDevice::DISPLAY_PRIMARY) {
             // All non-virtual displays are currently considered secure.
             bool isSecure = true;
             createBuiltinDisplayLocked(type);
@@ -563,11 +567,11 @@ void SurfaceFlinger::init() {
             sp<IGraphicBufferConsumer> consumer;
             BufferQueue::createBufferQueue(&producer, &consumer);
 
-            sp<FramebufferSurface> fbs = new FramebufferSurface(*mHwc, i,
+            sp<FramebufferSurface> fbs = new FramebufferSurface(*getBE().mHwc, i,
                     consumer);
             int32_t hwcId = allocateHwcDisplayId(type);
             sp<DisplayDevice> hw = new DisplayDevice(this,
-                    type, hwcId, mHwc->getFormat(hwcId), isSecure, token,
+                    type, hwcId, getBE().mHwc->getFormat(hwcId), isSecure, token,
                     fbs, producer,
                     mRenderEngine->getEGLConfig(), false);
             if (i > DisplayDevice::DISPLAY_PRIMARY) {
@@ -589,7 +593,7 @@ void SurfaceFlinger::init() {
     mEventControlThread->run("EventControl", PRIORITY_URGENT_DISPLAY);
 
     // set a fake vsync period if there is no HWComposer
-    if (mHwc->initCheck() != NO_ERROR) {
+    if (getBE().mHwc->initCheck() != NO_ERROR) {
         mPrimaryDispSync.setPeriod(16666667);
     }
 
@@ -612,7 +616,7 @@ void SurfaceFlinger::init() {
 
 int32_t SurfaceFlinger::allocateHwcDisplayId(DisplayDevice::DisplayType type) {
     return (uint32_t(type) < DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES) ?
-            type : mHwc->allocateDisplayId();
+            type : getBE().mHwc->allocateDisplayId();
 }
 
 void SurfaceFlinger::startBootAnim() {
@@ -1298,7 +1302,7 @@ void SurfaceFlinger::postComposition(nsecs_t refreshStartTime)
     }
 
     mDisplayTimeline.updateSignalTimes();
-    sp<Fence> retireFence = mHwc->getDisplayFence(HWC_DISPLAY_PRIMARY);
+    sp<Fence> retireFence = getBE().mHwc->getDisplayFence(HWC_DISPLAY_PRIMARY);
     auto retireFenceTime = std::make_shared<FenceTime>(retireFence);
     mDisplayTimeline.push(retireFenceTime);
 
@@ -1761,7 +1765,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             }
 
                             sp<VirtualDisplaySurface> vds = new VirtualDisplaySurface(
-                                    *mHwc, hwcDisplayId, state.surface,
+                                    *getBE().mHwc, hwcDisplayId, state.surface,
                                     bqProducer, bqConsumer, state.displayName);
 
                             dispSurface = vds;
@@ -1775,7 +1779,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         hwcDisplayId = allocateHwcDisplayId(state.type);
                         // for supported (by hwc) displays we provide our
                         // own rendering surface
-                        dispSurface = new FramebufferSurface(*mHwc, state.type,
+                        dispSurface = new FramebufferSurface(*getBE().mHwc, state.type,
                                 bqConsumer);
                         producer = bqProducer;
                     }
@@ -1784,7 +1788,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                     if (dispSurface != NULL) {
                         sp<DisplayDevice> hw = new DisplayDevice(this,
                                 state.type, hwcDisplayId,
-                                mHwc->getFormat(hwcDisplayId), state.isSecure,
+                                getBE().mHwc->getFormat(hwcDisplayId), state.isSecure,
                                 display, dispSurface, producer,
                                 mRenderEngine->getEGLConfig(), false);
                         hw->setLayerStack(state.layerStack);
@@ -1794,7 +1798,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         mDisplays.add(display, hw);
                         if (state.isVirtualDisplay()) {
                             if (hwcDisplayId >= 0) {
-                                mHwc->setVirtualDisplayProperties(hwcDisplayId,
+                                getBE().mHwc->setVirtualDisplayProperties(hwcDisplayId,
                                         hw->getWidth(), hw->getHeight(),
                                         hw->getFormat());
                             }
@@ -3310,7 +3314,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     result.appendFormat("app phase %" PRId64 " ns, sf phase %" PRId64 " ns, "
             "present offset %" PRId64 " ns (refresh %" PRId64 " ns)",
         vsyncPhaseOffsetNs, sfVsyncPhaseOffsetNs, dispSyncPresentTimeOffset,
-        mHwc->getRefreshPeriod(HWC_DISPLAY_PRIMARY));
+        getBE().mHwc->getRefreshPeriod(HWC_DISPLAY_PRIMARY));
     result.append("\n");
 
     // Dump static screen stats
