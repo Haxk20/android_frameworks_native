@@ -44,6 +44,7 @@
 #include <sstream>
 
 // ---------------------------------------------------------------------------
+#ifdef USE_HWC2
 bool checkGlError(const char* op, int lineNumber) {
     bool errorFound = false;
     GLint error = glGetError();
@@ -102,6 +103,7 @@ void writePPM(const char* basename, GLuint width, GLuint height) {
     }
     file.write(reinterpret_cast<char*>(outBuffer.data()), outBuffer.size());
 }
+#endif
 
 // ---------------------------------------------------------------------------
 namespace android {
@@ -133,6 +135,7 @@ GLES20RenderEngine::GLES20RenderEngine(uint32_t featureFlags)
 
     // mColorBlindnessCorrection = M;
 
+#ifdef USE_HWC2
     if (mPlatformHasWideColor) {
         ColorSpace srgb(ColorSpace::sRGB());
         ColorSpace displayP3(ColorSpace::DisplayP3());
@@ -154,6 +157,7 @@ GLES20RenderEngine::GLES20RenderEngine(uint32_t featureFlags)
         mXyzToDisplayP3 = mat4(displayP3.getXYZtoRGB());
         mXyzToBt2020 = mat4(bt2020.getXYZtoRGB());
     }
+#endif
 }
 
 GLES20RenderEngine::~GLES20RenderEngine() {}
@@ -225,6 +229,7 @@ void GLES20RenderEngine::setupLayerBlending(bool premultipliedAlpha, bool opaque
     }
 }
 
+#ifdef USE_HWC2
 void GLES20RenderEngine::setSourceY410BT2020(bool enable) {
     mState.setY410BT2020(enable);
 }
@@ -240,6 +245,7 @@ void GLES20RenderEngine::setOutputDataSpace(Dataspace dataspace) {
 void GLES20RenderEngine::setDisplayMaxLuminance(const float maxLuminance) {
     mState.setDisplayMaxLuminance(maxLuminance);
 }
+#endif
 
 void GLES20RenderEngine::setupLayerTexturing(const Texture& texture) {
     GLuint target = texture.getTextureTarget();
@@ -322,6 +328,7 @@ void GLES20RenderEngine::drawMesh(const Mesh& mesh) {
     glVertexAttribPointer(Program::position, mesh.getVertexSize(), GL_FLOAT, GL_FALSE,
                           mesh.getByteStride(), mesh.getPositions());
 
+#ifdef USE_HWC2
     // By default, DISPLAY_P3 is the only supported wide color output. However,
     // when HDR content is present, hardware composer may be able to handle
     // BT2020 data space, in that case, the output data space is set to be
@@ -431,6 +438,11 @@ void GLES20RenderEngine::drawMesh(const Mesh& mesh) {
 
         glDrawArrays(mesh.getPrimitive(), 0, mesh.getVertexCount());
     }
+#else
+    ProgramCache::getInstance().useProgram(mState);
+
+    glDrawArrays(mesh.getPrimitive(), 0, mesh.getVertexCount());
+#endif
 
     if (mesh.getTexCoordsSize()) {
         glDisableVertexAttribArray(Program::texCoords);
@@ -444,6 +456,7 @@ void GLES20RenderEngine::dump(String8& result) {
                         dataspaceDetails(static_cast<android_dataspace>(mOutputDataSpace)).c_str());
 }
 
+#ifdef USE_HWC2
 bool GLES20RenderEngine::isHdrDataSpace(const Dataspace dataSpace) const {
     const Dataspace standard = static_cast<Dataspace>(dataSpace & Dataspace::STANDARD_MASK);
     const Dataspace transfer = static_cast<Dataspace>(dataSpace & Dataspace::TRANSFER_MASK);
@@ -470,6 +483,7 @@ bool GLES20RenderEngine::needsXYZTransformMatrix() const {
 
     return (isInputHdrDataSpace || isOutputHdrDataSpace) && inputTransfer != outputTransfer;
 }
+#endif
 
 // ---------------------------------------------------------------------------
 } // namespace impl

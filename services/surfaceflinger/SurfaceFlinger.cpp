@@ -2904,13 +2904,14 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& displayDev
         ALOGV("hasClientComposition");
 
         Dataspace outputDataspace = Dataspace::UNKNOWN;
+#ifdef USE_HWC2
         if (displayDevice->hasWideColorGamut()) {
             outputDataspace = displayDevice->getCompositionDataSpace();
         }
         getBE().mRenderEngine->setOutputDataSpace(outputDataspace);
         getBE().mRenderEngine->setDisplayMaxLuminance(
                 displayDevice->getHdrCapabilities().getDesiredMaxLuminance());
-
+#endif
         const bool hasDeviceComposition = getBE().mHwc->hasDeviceComposition(hwcId);
         const bool skipClientColorTransform = getBE().mHwc->hasCapability(
             HWC2::Capability::SkipClientColorTransform);

@@ -118,12 +118,13 @@ public:
     virtual void disableTexturing() = 0;
     virtual void disableBlending() = 0;
 
+#ifdef USE_HWC2
     // HDR and wide color gamut support
     virtual void setSourceY410BT2020(bool enable) = 0;
     virtual void setSourceDataSpace(ui::Dataspace source) = 0;
     virtual void setOutputDataSpace(ui::Dataspace dataspace) = 0;
     virtual void setDisplayMaxLuminance(const float maxLuminance) = 0;
-
+#endif
     // drawing
     virtual void drawMesh(const Mesh& mesh) = 0;
 

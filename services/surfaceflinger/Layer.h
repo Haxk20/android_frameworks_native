@@ -75,17 +75,23 @@ class SurfaceInterceptor;
 // ---------------------------------------------------------------------------
 
 struct CompositionInfo {
+#ifdef USE_HWC2
     HWC2::Composition compositionType;
+#endif
     sp<GraphicBuffer> mBuffer = nullptr;
     int mBufferSlot = BufferQueue::INVALID_BUFFER_SLOT;
     struct {
         HWComposer* hwc;
         sp<Fence> fence;
+#ifdef USE_HWC2
         HWC2::BlendMode blendMode;
+#endif
         Rect displayFrame;
         float alpha;
         FloatRect sourceCrop;
+#ifdef USE_HWC2
         HWC2::Transform transform;
+#endif
         int z;
         int type;
         int appId;
@@ -112,21 +118,35 @@ public:
     struct HWCInfo {
         HWCInfo()
               : hwc(nullptr),
+#ifdef USE_HWC2
                 layer(nullptr),
+#endif
                 forceClientComposition(false),
+#ifdef USE_HWC2
                 compositionType(HWC2::Composition::Invalid),
-                clearClientTarget(false),
-                transform(HWC2::Transform::None) {}
+#endif
+                clearClientTarget(false)
+#ifdef USE_HWC2
+                ,
+                transform(HWC2::Transform::None)
+#endif
+                {}
 
         HWComposer* hwc;
+#ifdef USE_HWC2
         HWC2::Layer* layer;
+#endif
         bool forceClientComposition;
+#ifdef USE_HWC2
         HWC2::Composition compositionType;
+#endif
         bool clearClientTarget;
         Rect displayFrame;
         FloatRect sourceCrop;
         HWComposerBufferCache bufferCache;
+#ifdef USE_HWC2
         HWC2::Transform transform;
+#endif
     };
 
     // A layer can be attached to multiple displays when operating in mirror mode
@@ -380,6 +400,7 @@ public:
 
     virtual bool isHdrY410() const { return false; }
 
+#ifdef USE_HWC2
     void setGeometry(const sp<const DisplayDevice>& displayDevice, uint32_t z);
     void forceClientComposition(int32_t hwcId);
     bool getForceClientComposition(int32_t hwcId);
@@ -392,11 +413,23 @@ public:
     void setClearClientTarget(int32_t hwcId, bool clear);
     bool getClearClientTarget(int32_t hwcId) const;
     void updateCursorPosition(const sp<const DisplayDevice>& hw);
+#else
+    void setGeometry(const sp<const DisplayDevice>& hw, HWComposer::HWCLayerInterface& layer);
+    void setPerFrameData(const sp<const DisplayDevice>& hw, HWComposer::HWCLayerInterface& layer);
+    virtual void setAcquireFence(const sp<const DisplayDevice>& hw,
+                                 HWComposer::HWCLayerInterface& layer) = 0;
+    Rect getPosition(const sp<const DisplayDevice>& hw);
+#endif
 
     /*
      * called after page-flip
      */
+#ifdef USE_HWC2
     virtual void onLayerDisplayed(const sp<Fence>& releaseFence);
+#else
+    virtual void onLayerDisplayed(const sp<const DisplayDevice>& hw,
+                                  HWComposer::HWCLayerInterface* layer);
+#endif
 
     virtual void abandon() {}
 
@@ -419,9 +452,10 @@ public:
         return false;
     }
 
+#ifdef USE_HWC2
     // If a buffer was replaced this frame, release the former buffer
     virtual void releasePendingBuffer(nsecs_t /*dequeueReadyTime*/) { }
-
+#endif
 
     /*
      * draw - performs some global clipping optimizations
@@ -505,6 +539,7 @@ public:
 
     int32_t getQueuedFrameCount() const { return mQueuedFrames; }
 
+#ifdef USE_HWC2
     // -----------------------------------------------------------------------
 
     bool createHwcLayer(HWComposer* hwc, int32_t hwcId);
@@ -522,12 +557,15 @@ public:
         return getBE().mHwcLayers[hwcId].layer;
     }
 
+#endif
     // -----------------------------------------------------------------------
 
     void clearWithOpenGL(const RenderArea& renderArea) const;
     void setFiltering(bool filtering);
     bool getFiltering() const;
 
+    // only for debugging
+    inline const sp<GraphicBuffer>& getActiveBuffer() const { return mActiveBuffer; }
 
     inline const State& getDrawingState() const { return mDrawingState; }
     inline const State& getCurrentState() const { return mCurrentState; }
@@ -536,8 +574,10 @@ public:
     LayerDebugInfo getLayerDebugInfo() const;
 
     /* always call base class first */
+#ifdef USE_HWC2
     static void miniDumpHeader(String8& result);
     void miniDump(String8& result, int32_t hwcId) const;
+#endif
     void dumpFrameStats(String8& result) const;
     void dumpFrameEvents(String8& result);
     void clearFrameStats();
@@ -758,6 +798,10 @@ protected:
     bool mNeedsFiltering;
 
     bool mPendingRemoval = false;
+
+#ifndef USE_HWC2
+    bool mIsGlesComposition;
+#endif
 
     // page-flip thread (currently main thread)
     bool mProtectedByApp; // application requires protected path to external sink

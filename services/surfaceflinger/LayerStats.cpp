@@ -65,10 +65,14 @@ void LayerStats::traverseLayerTreeStatsLocked(
         traverseLayerTreeStatsLocked(layer->children, layerGlobal, outLayerShapeVec);
         std::string key = "";
         base::StringAppendF(&key, ",%s", layer->type.c_str());
+#ifdef USE_HWC2
         base::StringAppendF(&key, ",%s", layerCompositionType(layer->hwcCompositionType));
+#endif
         base::StringAppendF(&key, ",%d", layer->isProtected);
+#ifdef USE_HWC2
         base::StringAppendF(&key, ",%s", layerTransform(layer->hwcTransform));
         base::StringAppendF(&key, ",%s", layerPixelFormat(layer->activeBuffer.format));
+#endif
         base::StringAppendF(&key, ",%s", layer->dataspace.c_str());
         base::StringAppendF(&key, ",%s",
                             destinationLocation(layer->hwcFrame.left, layerGlobal.resolution[0],
@@ -101,9 +105,18 @@ void LayerStats::logLayerStats(const LayersProto& layersProto) {
     traverseLayerTreeStatsLocked(layerTree, layerGlobal, &layerShapeVec);
 
     std::string layerShapeKey =
-            base::StringPrintf("%d,%s,%s,%s", static_cast<int32_t>(layerShapeVec.size()),
-                               layerGlobal.colorMode.c_str(), layerGlobal.colorTransform.c_str(),
-                               layerTransform(layerGlobal.globalTransform));
+            base::StringPrintf(
+#ifdef USE_HWC2
+                               "%d,%s,%s,%s",
+#else
+                               "%d,%s,%s",
+#endif
+                               static_cast<int32_t>(layerShapeVec.size()),
+                               layerGlobal.colorMode.c_str(), layerGlobal.colorTransform.c_str()
+#ifdef USE_HWC2
+                               , layerTransform(layerGlobal.globalTransform)
+#endif
+            );
     ALOGV("%s", layerShapeKey.c_str());
 
     std::sort(layerShapeVec.begin(), layerShapeVec.end(), std::greater<std::string>());
@@ -154,6 +167,7 @@ const char* LayerStats::destinationSize(int32_t size, int32_t range, bool isWidt
     return sizeArray[ratio];
 }
 
+#ifdef USE_HWC2
 const char* LayerStats::layerTransform(int32_t transform) {
     return getTransformName(static_cast<hwc_transform_t>(transform));
 }
@@ -165,6 +179,7 @@ const char* LayerStats::layerCompositionType(int32_t compositionType) {
 const char* LayerStats::layerPixelFormat(int32_t pixelFormat) {
     return decodePixelFormat(pixelFormat).c_str();
 }
+#endif
 
 std::string LayerStats::scaleRatioWH(const LayerProtoParser::Layer* layer) {
     if (!layer->type.compare("ColorLayer")) return "N/A,N/A";

@@ -71,11 +71,13 @@ protected:
     virtual void setupLayerBlending(bool premultipliedAlpha, bool opaque, bool disableTexture,
                                     const half4& color) override;
 
+#ifdef USE_HWC2
     // Color management related functions and state
     void setSourceY410BT2020(bool enable) override;
     void setSourceDataSpace(ui::Dataspace source) override;
     void setOutputDataSpace(ui::Dataspace dataspace) override;
     void setDisplayMaxLuminance(const float maxLuminance) override;
+#endif
 
     virtual void setupLayerTexturing(const Texture& texture);
     virtual void setupLayerBlackedOut();
@@ -106,12 +108,13 @@ protected:
     mat4 mXyzToSrgb;
     mat4 mXyzToDisplayP3;
     mat4 mXyzToBt2020;
-
+#ifdef USE_HWC2
 private:
     // A data space is considered HDR data space if it has BT2020 color space
     // with PQ or HLG transfer function.
     bool isHdrDataSpace(const ui::Dataspace dataSpace) const;
     bool needsXYZTransformMatrix() const;
+#endif
 };
 
 // ---------------------------------------------------------------------------

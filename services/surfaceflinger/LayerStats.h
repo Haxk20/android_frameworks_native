@@ -45,12 +45,14 @@ private:
     static const char* destinationLocation(int32_t location, int32_t range, bool isHorizontal);
     // Convert layer's size into 8x8 percentage of the display
     static const char* destinationSize(int32_t size, int32_t range, bool isWidth);
+#ifdef USE_HWC2
     // Return the name of the transform
     static const char* layerTransform(int32_t transform);
     // Return the name of the composition type
     static const char* layerCompositionType(int32_t compositionType);
     // Return the name of the pixel format
     static const char* layerPixelFormat(int32_t pixelFormat);
+#endif
     // Calculate scale ratios of layer's width/height with rotation information
     static std::string scaleRatioWH(const LayerProtoParser::Layer* layer);
     // Calculate scale ratio from source to destination and convert to string

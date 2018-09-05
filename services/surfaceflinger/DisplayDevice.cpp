@@ -41,7 +41,9 @@
 
 #include "DisplayHardware/DisplaySurface.h"
 #include "DisplayHardware/HWComposer.h"
+#ifdef USE_HWC2
 #include "DisplayHardware/HWC2.h"
+#endif
 #include "RenderEngine/RenderEngine.h"
 
 #include "clz.h"
@@ -69,6 +71,7 @@ using android::ui::RenderIntent;
 
 uint32_t DisplayDevice::sPrimaryDisplayOrientation = 0;
 
+#ifdef USE_HWC2
 namespace {
 
 // ordered list of known SDR color modes
@@ -211,12 +214,16 @@ RenderIntent getHwcRenderIntent(const std::vector<RenderIntent>& hwcIntents, Ren
 }
 
 } // anonymous namespace
+#endif
 
 // clang-format off
 DisplayDevice::DisplayDevice(
         const sp<SurfaceFlinger>& flinger,
         DisplayType type,
         int32_t hwcId,
+#ifndef USE_HWC2
+        int format,
+#endif
         bool isSecure,
         const wp<IBinder>& displayToken,
         const sp<ANativeWindow>& nativeWindow,
@@ -224,10 +231,12 @@ DisplayDevice::DisplayDevice(
         std::unique_ptr<RE::Surface> renderSurface,
         int displayWidth,
         int displayHeight,
+#ifdef USE_HWC2
         bool hasWideColorGamut,
         const HdrCapabilities& hdrCapabilities,
         const int32_t supportedPerFrameMetadata,
         const std::unordered_map<ColorMode, std::vector<RenderIntent>>& hwcColorModes,
+#endif
         int initialPowerMode)
     : lastCompositionHadVisibleLayers(false),
       mFlinger(flinger),
@@ -246,14 +255,18 @@ DisplayDevice::DisplayDevice(
       mViewport(Rect::INVALID_RECT),
       mFrame(Rect::INVALID_RECT),
       mPowerMode(initialPowerMode),
-      mActiveConfig(0),
+      mActiveConfig(0)
+#ifdef USE_HWC2
+,
       mColorTransform(HAL_COLOR_TRANSFORM_IDENTITY),
       mHasWideColorGamut(hasWideColorGamut),
       mHasHdr10(false),
       mHasHLG(false),
       mHasDolbyVision(false),
       mSupportedPerFrameMetadata(supportedPerFrameMetadata)
+#endif
 {
+#ifdef USE_HWC2
     // clang-format on
     populateColorModes(hwcColorModes);
 
@@ -281,6 +294,7 @@ DisplayDevice::DisplayDevice(
     minLuminance = minLuminance <= 0.0 ? sDefaultMinLumiance : minLuminance;
     maxLuminance = maxLuminance <= 0.0 ? sDefaultMaxLumiance : maxLuminance;
     maxAverageLuminance = maxAverageLuminance <= 0.0 ? sDefaultMaxLumiance : maxAverageLuminance;
+
     if (this->hasWideColorGamut()) {
         // insert HDR10/HLG as we will force client composition for HDR10/HLG
         // layers
@@ -293,6 +307,9 @@ DisplayDevice::DisplayDevice(
         }
     }
     mHdrCapabilities = HdrCapabilities(types, maxLuminance, maxAverageLuminance, minLuminance);
+#else
+    (void)format;
+#endif
 
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
@@ -303,6 +320,10 @@ DisplayDevice::~DisplayDevice() = default;
 void DisplayDevice::disconnect(HWComposer& hwc) {
     if (mHwcDisplayId >= 0) {
         hwc.disconnectDisplay(mHwcDisplayId);
+#ifndef USE_HWC2
+        if (mHwcDisplayId >= DISPLAY_VIRTUAL)
+            hwc.freeDisplayId(mHwcDisplayId);
+#endif
         mHwcDisplayId = -1;
     }
 }
@@ -319,6 +340,12 @@ int DisplayDevice::getHeight() const {
     return mDisplayHeight;
 }
 
+#ifndef USE_HWC2
+PixelFormat DisplayDevice::getFormat() const {
+    return mFormat;
+}
+#endif
+
 void DisplayDevice::setDisplayName(const String8& displayName) {
     if (!displayName.isEmpty()) {
         // never override the name with an empty name
@@ -330,6 +357,12 @@ uint32_t DisplayDevice::getPageFlipCount() const {
     return mPageFlipCount;
 }
 
+#ifndef USE_HWC2
+status_t DisplayDevice::compositionComplete() const {
+    return mDisplaySurface->compositionComplete();
+}
+#endif
+
 void DisplayDevice::flip() const
 {
     mFlinger->getRenderEngine().checkErrors();
@@ -340,6 +373,7 @@ status_t DisplayDevice::beginFrame(bool mustRecompose) const {
     return mDisplaySurface->beginFrame(mustRecompose);
 }
 
+#ifdef USE_HWC2
 status_t DisplayDevice::prepareFrame(HWComposer& hwc) {
     status_t error = hwc.prepare(*this);
     if (error != NO_ERROR) {
@@ -363,9 +397,41 @@ status_t DisplayDevice::prepareFrame(HWComposer& hwc) {
     }
     return mDisplaySurface->prepareFrame(compositionType);
 }
+#else
+status_t DisplayDevice::prepareFrame(const HWComposer& hwc) const {
+    DisplaySurface::CompositionType compositionType;
+    bool haveGles = hwc.hasGlesComposition(mHwcDisplayId);
+    bool haveHwc = hwc.hasHwcComposition(mHwcDisplayId);
+    if (haveGles && haveHwc) {
+        compositionType = DisplaySurface::COMPOSITION_MIXED;
+    } else if (haveGles) {
+        compositionType = DisplaySurface::COMPOSITION_GLES;
+    } else if (haveHwc) {
+        compositionType = DisplaySurface::COMPOSITION_HWC;
+    } else {
+        // Nothing to do -- when turning the screen off we get a frame like
+        // this. Call it a HWC frame since we won't be doing any GLES work but
+        // will do a prepare/set cycle.
+        compositionType = DisplaySurface::COMPOSITION_HWC;
+    }
+    return mDisplaySurface->prepareFrame(compositionType);
+}
+#endif
 
 void DisplayDevice::swapBuffers(HWComposer& hwc) const {
+#ifdef USE_HWC2
     if (hwc.hasClientComposition(mHwcDisplayId) || hwc.hasFlipClientTargetRequest(mHwcDisplayId)) {
+#else
+    // We need to call eglSwapBuffers() if:
+    //  (1) we don't have a hardware composer, or
+    //  (2) we did GLES composition this frame, and either
+    //    (a) we have framebuffer target support (not present on legacy
+    //        devices, where HWComposer::commit() handles things); or
+    //    (b) this is a virtual display
+    if (hwc.initCheck() != NO_ERROR ||
+            (hwc.hasGlesComposition(mHwcDisplayId) &&
+             (hwc.supportsFramebufferTarget() || mType >= DISPLAY_VIRTUAL))) {
+#endif
         mSurface->swapBuffers();
     }
 
@@ -376,9 +442,17 @@ void DisplayDevice::swapBuffers(HWComposer& hwc) const {
     }
 }
 
+#ifdef USE_HWC2
 void DisplayDevice::onSwapBuffersCompleted() const {
     mDisplaySurface->onFrameCommitted();
 }
+#else
+void DisplayDevice::onSwapBuffersCompleted(HWComposer& hwc) const {
+    if (hwc.initCheck() == NO_ERROR) {
+        mDisplaySurface->onFrameCommitted();
+    }
+}
+#endif
 
 bool DisplayDevice::makeCurrent() const {
     bool success = mFlinger->getRenderEngine().setCurrentSurface(*mSurface);
@@ -451,6 +525,7 @@ int DisplayDevice::getActiveConfig()  const {
 }
 
 // ----------------------------------------------------------------------------
+#ifdef USE_HWC2
 void DisplayDevice::setActiveColorMode(ColorMode mode) {
     mActiveColorMode = mode;
 }
@@ -486,6 +561,7 @@ void DisplayDevice::setCompositionDataSpace(ui::Dataspace dataspace) {
 ui::Dataspace DisplayDevice::getCompositionDataSpace() const {
     return mCompositionDataSpace;
 }
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -675,18 +751,20 @@ void DisplayDevice::dump(String8& result) const {
                         mFrame.left, mFrame.top, mFrame.right, mFrame.bottom, mScissor.left,
                         mScissor.top, mScissor.right, mScissor.bottom, tr[0][0], tr[1][0], tr[2][0],
                         tr[0][1], tr[1][1], tr[2][1], tr[0][2], tr[1][2], tr[2][2]);
+#ifdef USE_HWC2
     auto const surface = static_cast<Surface*>(window);
     ui::Dataspace dataspace = surface->getBuffersDataSpace();
     result.appendFormat("   wideColorGamut=%d, hdr10=%d, colorMode=%s, dataspace: %s (%d)\n",
                         mHasWideColorGamut, mHasHdr10,
                         decodeColorMode(mActiveColorMode).c_str(),
                         dataspaceDetails(static_cast<android_dataspace>(dataspace)).c_str(), dataspace);
-
+#endif
     String8 surfaceDump;
     mDisplaySurface->dumpAsString(surfaceDump);
     result.append(surfaceDump);
 }
 
+#ifdef USE_HWC2
 // Map dataspace/intent to the best matched dataspace/colorMode/renderIntent
 // supported by HWC.
 void DisplayDevice::addColorMode(
@@ -790,6 +868,7 @@ void DisplayDevice::getBestColorMode(Dataspace dataspace, RenderIntent intent,
         *outIntent = RenderIntent::COLORIMETRIC;
     }
 }
+#endif
 
 std::atomic<int32_t> DisplayDeviceState::nextDisplayId(1);
 

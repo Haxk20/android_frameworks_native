@@ -120,6 +120,13 @@ uint64_t SurfaceFlinger::maxVirtualDisplaySize;
 bool SurfaceFlinger::hasSyncFramework;
 int64_t SurfaceFlinger::maxFrameBufferAcquiredBuffers;
 
+std::string getHwcServiceName() {
+    char value[PROPERTY_VALUE_MAX] = {};
+    property_get("debug.sf.hwc_service_name", value, "default");
+    ALOGI("Using HWComposer service: '%s'", value);
+    return std::string(value);
+}
+
 SurfaceFlingerBE::SurfaceFlingerBE()
       : mHwcServiceName(getHwcServiceName()),
         mRenderEngine(NULL),

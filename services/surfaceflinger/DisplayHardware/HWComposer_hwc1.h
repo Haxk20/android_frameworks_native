@@ -25,6 +25,7 @@
 #include <system/graphics.h>
 
 #include <ui/Fence.h>
+#include <ui/Rect.h>
 
 #include <utils/BitSet.h>
 #include <utils/Condition.h>

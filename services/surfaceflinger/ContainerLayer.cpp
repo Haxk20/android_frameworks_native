@@ -34,6 +34,8 @@ bool ContainerLayer::isVisible() const {
     return !isHiddenByPolicy();
 }
 
+#ifdef USE_HWC2
 void ContainerLayer::setPerFrameData(const sp<const DisplayDevice>&) {}
+#endif
 
 } // namespace android

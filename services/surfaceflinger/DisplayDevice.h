@@ -28,7 +28,9 @@
 #include <gui/ISurfaceComposer.h>
 #include <hardware/hwcomposer_defs.h>
 #include <ui/GraphicTypes.h>
+#ifdef USE_HWC2
 #include <ui/HdrCapabilities.h>
+#endif
 #include <ui/Region.h>
 #include <utils/RefBase.h>
 #include <utils/Mutex.h>
@@ -38,7 +40,9 @@
 #include "RenderArea.h"
 #include "RenderEngine/Surface.h"
 
+#ifdef USE_HWC2
 #include <memory>
+#endif
 
 struct ANativeWindow;
 
@@ -52,6 +56,18 @@ class Layer;
 class SurfaceFlinger;
 class HWComposer;
 
+////
+/* Display types and associated mask bits. */
+enum {
+    HWC_DISPLAY_PRIMARY     = 0,
+    HWC_DISPLAY_EXTERNAL    = 1,    // HDMI, DP, etc.
+    HWC_DISPLAY_VIRTUAL     = 2,
+
+    HWC_NUM_PHYSICAL_DISPLAY_TYPES = 2,
+    HWC_NUM_DISPLAY_TYPES          = 3,
+};
+/////
+
 class DisplayDevice : public LightRefBase<DisplayDevice>
 {
 public:
@@ -63,7 +79,6 @@ public:
     // region in screen space
     Region undefinedRegion;
     bool lastCompositionHadVisibleLayers;
-
     enum DisplayType {
         DISPLAY_ID_INVALID = -1,
         DISPLAY_PRIMARY     = HWC_DISPLAY_PRIMARY,
@@ -81,6 +96,9 @@ public:
             const sp<SurfaceFlinger>& flinger,
             DisplayType type,
             int32_t hwcId,
+#ifndef USE_HWC2
+            int format,
+#endif
             bool isSecure,
             const wp<IBinder>& displayToken,
             const sp<ANativeWindow>& nativeWindow,
@@ -88,10 +106,12 @@ public:
             std::unique_ptr<RE::Surface> renderSurface,
             int displayWidth,
             int displayHeight,
+#ifdef USE_HWC2
             bool hasWideColorGamut,
             const HdrCapabilities& hdrCapabilities,
             const int32_t supportedPerFrameMetadata,
             const std::unordered_map<ui::ColorMode, std::vector<ui::RenderIntent>>& hwcColorModes,
+#endif
             int initialPowerMode);
     // clang-format on
 
@@ -111,6 +131,9 @@ public:
 
     int         getWidth() const;
     int         getHeight() const;
+#ifndef USE_HWC2
+    PixelFormat getFormat() const;
+#endif
 
     void                    setVisibleLayersSortedByZ(const Vector< sp<Layer> >& layers);
     const Vector< sp<Layer> >& getVisibleLayersSortedByZ() const;
@@ -137,11 +160,13 @@ public:
     int32_t                 getHwcDisplayId() const { return mHwcDisplayId; }
     const wp<IBinder>&      getDisplayToken() const { return mDisplayToken; }
 
+#ifdef USE_HWC2
     int32_t getSupportedPerFrameMetadata() const { return mSupportedPerFrameMetadata; }
-
+#endif
     // We pass in mustRecompose so we can keep VirtualDisplaySurface's state
     // machine happy without actually queueing a buffer if nothing has changed
     status_t beginFrame(bool mustRecompose) const;
+#ifdef USE_HWC2
     status_t prepareFrame(HWComposer& hwc);
 
     bool hasWideColorGamut() const { return mHasWideColorGamut; }
@@ -168,11 +193,21 @@ public:
     void getBestColorMode(ui::Dataspace dataspace, ui::RenderIntent intent,
                           ui::Dataspace* outDataspace, ui::ColorMode* outMode,
                           ui::RenderIntent* outIntent) const;
+#else
+    status_t prepareFrame(const HWComposer& hwc) const;
+#endif
 
     void swapBuffers(HWComposer& hwc) const;
+#ifndef USE_HWC2
+    status_t compositionComplete() const;
+#endif
 
     // called after h/w composer has completed its set() call
+#ifdef USE_HWC2
     void onSwapBuffersCompleted() const;
+#else
+    void onSwapBuffersCompleted(HWComposer& hwc) const;
+#endif
 
     Rect getBounds() const {
         return Rect(mDisplayWidth, mDisplayHeight);
@@ -194,6 +229,7 @@ public:
     void setPowerMode(int mode);
     bool isDisplayOn() const;
 
+#ifdef USE_HWC2
     ui::ColorMode getActiveColorMode() const;
     void setActiveColorMode(ui::ColorMode mode);
     ui::RenderIntent getActiveRenderIntent() const;
@@ -202,6 +238,7 @@ public:
     void setColorTransform(const mat4& transform);
     void setCompositionDataSpace(ui::Dataspace dataspace);
     ui::Dataspace getCompositionDataSpace() const;
+#endif
 
     /* ------------------------------------------------------------------------
      * Display active config management.
@@ -234,6 +271,9 @@ private:
     std::unique_ptr<RE::Surface> mSurface;
     int             mDisplayWidth;
     int             mDisplayHeight;
+#ifndef USE_HWC2
+    PixelFormat     mFormat;
+#endif
     mutable uint32_t mPageFlipCount;
     String8         mDisplayName;
     bool            mIsSecure;
@@ -273,6 +313,7 @@ private:
     int mPowerMode;
     // Current active config
     int mActiveConfig;
+#ifdef USE_HWC2
     // current active color mode
     ui::ColorMode mActiveColorMode = ui::ColorMode::NATIVE;
     // Current active render intent.
@@ -310,16 +351,15 @@ private:
             const ui::ColorMode mode, const ui::RenderIntent intent);
 
     std::unordered_map<ColorModeKey, ColorModeValue> mColorModes;
+#endif
 };
 
 struct DisplayDeviceState {
     DisplayDeviceState() = default;
     DisplayDeviceState(DisplayDevice::DisplayType type, bool isSecure);
-
     bool isValid() const { return type >= 0; }
     bool isMainDisplay() const { return type == DisplayDevice::DISPLAY_PRIMARY; }
     bool isVirtualDisplay() const { return type >= DisplayDevice::DISPLAY_VIRTUAL; }
-
     static std::atomic<int32_t> nextDisplayId;
     int32_t displayId = nextDisplayId++;
     DisplayDevice::DisplayType type = DisplayDevice::DISPLAY_ID_INVALID;

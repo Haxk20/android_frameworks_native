@@ -33,8 +33,9 @@ public:
     void onDraw(const RenderArea& renderArea, const Region& clip,
                 bool useIdentityTransform) const override;
     bool isVisible() const override;
-
+#ifdef USE_HWC2
     void setPerFrameData(const sp<const DisplayDevice>& displayDevice) override;
+#endif
 };
 
 } // namespace android

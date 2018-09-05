@@ -124,6 +124,7 @@ filegroup {
         "RenderEngine/Texture.cpp",
         "StartPropertySetThread.cpp",
         "SurfaceFlinger_hwc1.cpp",
+        "SurfaceFlingerConsumer.cpp",
         "SurfaceInterceptor.cpp",
         "SurfaceTracing.cpp",
         "TimeStats/TimeStats.cpp",
@@ -218,5 +219,4 @@ cc_library_shared {
 subdirs = [
     "layerproto",
     "TimeStats/timestatsproto",
-    "tests",
 ]
