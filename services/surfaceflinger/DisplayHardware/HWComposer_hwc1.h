@@ -26,6 +26,7 @@
 
 #include <ui/Fence.h>
 #include <ui/Rect.h>
+#include <ui/GraphicTypes.h>
 
 #include <utils/BitSet.h>
 #include <utils/Condition.h>
@@ -55,6 +56,8 @@ class NativeHandle;
 class Region;
 class String8;
 class SurfaceFlinger;
+
+using ui::ColorMode;
 
 class HWComposer
 {
@@ -262,7 +265,7 @@ public:
         float xdpi;
         float ydpi;
         nsecs_t refresh;
-        android_color_mode_t colorMode;
+        ColorMode colorMode;
         bool operator==(const DisplayConfig& rhs) const {
             return width == rhs.width &&
                     height == rhs.height &&
@@ -287,7 +290,7 @@ public:
     float getDpiX(int disp) const;
     float getDpiY(int disp) const;
     nsecs_t getRefreshPeriod(int disp) const;
-    android_color_mode_t getColorMode(int disp) const;
+    ColorMode getColorMode(int disp) const;
 
     const Vector<DisplayConfig>& getConfigs(int disp) const;
     size_t getCurrentConfig(int disp) const;

@@ -33,6 +33,7 @@
 #include <utils/Vector.h>
 
 #include <ui/GraphicBuffer.h>
+#include <ui/GraphicTypes.h>
 
 #include <hardware/hardware.h>
 #include <hardware/hwcomposer.h>
@@ -50,6 +51,8 @@
 #include "../SurfaceFlinger.h"
 
 namespace android {
+
+using ui::ColorMode;
 
 #define MIN_HWC_HEADER_VERSION HWC_HEADER_VERSION
 
@@ -405,7 +408,7 @@ status_t HWComposer::queryDisplayProperties(int disp) {
                     config.ydpi = values[i] / 1000.0f;
                     break;
                 case HWC_DISPLAY_COLOR_TRANSFORM:
-                    config.colorMode = static_cast<android_color_mode_t>(values[i]);
+                    config.colorMode = static_cast<ColorMode>(values[i]);
                     break;
                 default:
                     ALOG_ASSERT(false, "unknown display attribute[%zu] %#x",
@@ -521,7 +524,7 @@ nsecs_t HWComposer::getRefreshPeriod(int disp) const {
     return mDisplayData[disp].configs[currentConfig].refresh;
 }
 
-android_color_mode_t HWComposer::getColorMode(int disp) const {
+ColorMode HWComposer::getColorMode(int disp) const {
     size_t currentConfig = mDisplayData[disp].currentConfig;
     return mDisplayData[disp].configs[currentConfig].colorMode;
 }

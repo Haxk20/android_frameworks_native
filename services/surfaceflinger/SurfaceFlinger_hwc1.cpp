@@ -50,6 +50,7 @@
 #include <ui/HdrCapabilities.h>
 #include <ui/PixelFormat.h>
 #include <ui/UiConfig.h>
+#include <ui/GraphicTypes.h>
 
 #include <utils/misc.h>
 #include <utils/String8.h>
@@ -107,6 +108,7 @@ namespace android {
 
 using namespace android::hardware::configstore;
 using namespace android::hardware::configstore::V1_0;
+using ui::ColorMode;
 
 const String16 sHardwareTest("android.permission.HARDWARE_TEST");
 const String16 sAccessSurfaceFlinger("android.permission.ACCESS_SURFACE_FLINGER");
@@ -847,7 +849,7 @@ status_t SurfaceFlinger::setActiveConfig(const sp<IBinder>& display, int mode) {
 }
 
 status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
-        Vector<android_color_mode_t>* outColorModes) {
+        Vector<ColorMode>* outColorModes) {
     if (outColorModes == nullptr || display.get() == nullptr) {
         return BAD_VALUE;
     }
@@ -855,7 +857,7 @@ status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
     int32_t type = getDisplayType(display);
     if (type < 0) return type;
 
-    std::set<android_color_mode_t> colorModes;
+    std::set<ColorMode> colorModes;
     for (const HWComposer::DisplayConfig& hwConfig : getHwComposer().getConfigs(type)) {
         colorModes.insert(hwConfig.colorMode);
     }
@@ -866,18 +868,18 @@ status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
     return NO_ERROR;
 }
 
-android_color_mode_t SurfaceFlinger::getActiveColorMode(const sp<IBinder>& display) {
-    if (display.get() == nullptr) return static_cast<android_color_mode_t>(BAD_VALUE);
+ColorMode SurfaceFlinger::getActiveColorMode(const sp<IBinder>& display) {
+    if (display.get() == nullptr) return static_cast<ColorMode>(BAD_VALUE);
 
     int32_t type = getDisplayType(display);
-    if (type < 0) return static_cast<android_color_mode_t>(type);
+    if (type < 0) return static_cast<ColorMode>(type);
 
     return getHwComposer().getColorMode(type);
 }
 
 status_t SurfaceFlinger::setActiveColorMode(const sp<IBinder>& display,
-        android_color_mode_t colorMode) {
-    if (display.get() == nullptr || colorMode < 0) {
+        ColorMode colorMode) {
+    if (display.get() == nullptr || static_cast<int>(colorMode) < 0) {
         return BAD_VALUE;
     }
 
