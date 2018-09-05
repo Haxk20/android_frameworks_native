@@ -35,6 +35,8 @@
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
 
+#include <hardware/hwcomposer2.h>
+
 #include <ui/DisplayInfo.h>
 #include <ui/DisplayStatInfo.h>
 
@@ -248,6 +250,15 @@ static sp<ISurfaceComposerClient> initClient(const sp<Client>& client) {
     }
     return nullptr;
 }
+
+#if 0
+void SurfaceFlinger::setVsyncEnabled(int disp, int enabled) {
+    ATRACE_CALL();
+    Mutex::Autolock lock(mStateLock);
+    getHwComposer().setVsyncEnabled(disp,
+            enabled ? HWC2::Vsync::Enable : HWC2::Vsync::Disable);
+}
+#endif
 
 sp<ISurfaceComposerClient> SurfaceFlinger::createConnection() {
     return initClient(new Client(this));
@@ -586,8 +597,11 @@ void SurfaceFlinger::init() {
     // (which may happens before we render something)
     getDefaultDisplayDeviceLocked()->makeCurrent(mEGLDisplay, mEGLContext);
 
-    mEventControlThread = new EventControlThread(this);
-    mEventControlThread->run("EventControl", PRIORITY_URGENT_DISPLAY);
+    mEventControlThread = std::make_unique<EventControlThread>([this](bool enabled) {
+        (void)this;
+        (void)enabled;
+        //setVsyncEnabled(HWC_DISPLAY_PRIMARY, enabled);
+    });
 
     // set a fake vsync period if there is no HWComposer
     if (getBE().mHwc->initCheck() != NO_ERROR) {
