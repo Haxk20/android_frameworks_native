@@ -501,6 +501,11 @@ private:
 
     // called on the main thread in response to initializeDisplays()
     void onInitializeDisplays();
+
+#ifndef USE_HWC2
+    void createBuiltinDisplayLocked(DisplayDevice::DisplayType type);
+#endif
+
     // called on the main thread in response to setActiveConfig()
     void setActiveConfigInternal(const sp<DisplayDevice>& hw, int mode);
     // called on the main thread in response to setPowerMode()
