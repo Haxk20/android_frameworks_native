@@ -220,7 +220,7 @@ SurfaceFlinger::SurfaceFlinger()
 
 void SurfaceFlinger::onFirstRef()
 {
-    mEventQueue.init(this);
+    mEventQueue->init(this);
 }
 
 SurfaceFlinger::~SurfaceFlinger()
@@ -532,7 +532,7 @@ void SurfaceFlinger::init() {
     sp<VSyncSource> sfVsyncSrc = new DispSyncSource(&mPrimaryDispSync,
             sfVsyncPhaseOffsetNs, true, "sf");
     mSFEventThread = new EventThread(sfVsyncSrc, *this, true);
-    mEventQueue.setEventThread(mSFEventThread);
+    mEventQueue->setEventThread(mSFEventThread);
 
     // set EventThread and SFEventThread to SCHED_FIFO to minimize jitter
     struct sched_param param = {0};
@@ -921,11 +921,11 @@ status_t SurfaceFlinger::enableVSyncInjections(bool enable) {
             mVSyncInjector = new InjectVSyncSource();
             mInjectorEventThread = new EventThread(mVSyncInjector, *this, false);
         }
-        mEventQueue.setEventThread(mInjectorEventThread);
+        mEventQueue->setEventThread(mInjectorEventThread);
     } else {
         mInjectVSyncs = enable;
         ALOGV("VSync Injections disabled");
-        mEventQueue.setEventThread(mSFEventThread);
+        mEventQueue->setEventThread(mSFEventThread);
         mVSyncInjector.clear();
     }
     return NO_ERROR;
@@ -985,29 +985,29 @@ sp<IDisplayEventConnection> SurfaceFlinger::createDisplayEventConnection(
 // ----------------------------------------------------------------------------
 
 void SurfaceFlinger::waitForEvent() {
-    mEventQueue.waitMessage();
+    mEventQueue->waitMessage();
 }
 
 void SurfaceFlinger::signalTransaction() {
-    mEventQueue.invalidate();
+    mEventQueue->invalidate();
 }
 
 void SurfaceFlinger::signalLayerUpdate() {
-    mEventQueue.invalidate();
+    mEventQueue->invalidate();
 }
 
 void SurfaceFlinger::signalRefresh() {
-    mEventQueue.refresh();
+    mEventQueue->refresh();
 }
 
 status_t SurfaceFlinger::postMessageAsync(const sp<MessageBase>& msg,
         nsecs_t reltime, uint32_t /* flags */) {
-    return mEventQueue.postMessage(msg, reltime);
+    return mEventQueue->postMessage(msg, reltime);
 }
 
 status_t SurfaceFlinger::postMessageSync(const sp<MessageBase>& msg,
         nsecs_t reltime, uint32_t /* flags */) {
-    status_t res = mEventQueue.postMessage(msg, reltime);
+    status_t res = mEventQueue->postMessage(msg, reltime);
     if (res == NO_ERROR) {
         msg->wait();
     }
