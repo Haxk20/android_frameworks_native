@@ -121,7 +121,9 @@ bool SurfaceFlinger::hasSyncFramework;
 int64_t SurfaceFlinger::maxFrameBufferAcquiredBuffers;
 
 SurfaceFlingerBE::SurfaceFlingerBE()
-    : mComposerSequenceId(0) {
+      : mHwcServiceName(getHwcServiceName()),
+        mRenderEngine(NULL),
+        mComposerSequenceId(0) {
 }
 
 SurfaceFlinger::SurfaceFlinger()
@@ -132,7 +134,6 @@ SurfaceFlinger::SurfaceFlinger()
         mLayersRemoved(false),
         mLayersAdded(false),
         mRepaintEverything(0),
-        mRenderEngine(NULL),
         mBootTime(systemTime()),
         mVisibleRegionsDirty(false),
         mHwWorkListDirty(false),
@@ -544,11 +545,11 @@ void SurfaceFlinger::init() {
             *static_cast<HWComposer::EventHandler *>(this)));
 
     // get a RenderEngine for the given display / config (can't fail)
-    mRenderEngine = RenderEngine::create(mEGLDisplay,
+    getBE().mRenderEngine = RenderEngine::create(mEGLDisplay,
             getBE().mHwc->getVisualID(), 0);
 
     // retrieve the EGL context that was selected/created
-    mEGLContext = mRenderEngine->getEGLContext();
+    mEGLContext = getBE().mRenderEngine->getEGLContext();
 
     LOG_ALWAYS_FATAL_IF(mEGLContext == EGL_NO_CONTEXT,
             "couldn't create EGLContext");
@@ -573,7 +574,7 @@ void SurfaceFlinger::init() {
             sp<DisplayDevice> hw = new DisplayDevice(this,
                     type, hwcId, getBE().mHwc->getFormat(hwcId), isSecure, token,
                     fbs, producer,
-                    mRenderEngine->getEGLConfig(), false);
+                    getBE().mRenderEngine->getEGLConfig(), false);
             if (i > DisplayDevice::DISPLAY_PRIMARY) {
                 // FIXME: currently we don't get blank/unblank requests
                 // for displays other than the main display, so we always
@@ -603,7 +604,7 @@ void SurfaceFlinger::init() {
     // set initial conditions (e.g. unblank default device)
     initializeDisplays();
 
-    mRenderEngine->primeCache();
+    getBE().mRenderEngine->primeCache();
 
     // Inform native graphics APIs that the present timestamp is NOT supported:
     mStartPropertySetThread = new StartPropertySetThread(false);
@@ -630,11 +631,11 @@ void SurfaceFlinger::startBootAnim() {
 }
 
 size_t SurfaceFlinger::getMaxTextureSize() const {
-    return mRenderEngine->getMaxTextureSize();
+    return getBE().mRenderEngine->getMaxTextureSize();
 }
 
 size_t SurfaceFlinger::getMaxViewportDims() const {
-    return mRenderEngine->getMaxViewportDims();
+    return getBE().mRenderEngine->getMaxViewportDims();
 }
 
 // ----------------------------------------------------------------------------
@@ -1790,7 +1791,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                                 state.type, hwcDisplayId,
                                 getBE().mHwc->getFormat(hwcDisplayId), state.isSecure,
                                 display, dispSurface, producer,
-                                mRenderEngine->getEGLConfig(), false);
+                                getBE().mRenderEngine->getEGLConfig(), false);
                         hw->setLayerStack(state.layerStack);
                         hw->setProjection(state.orientation,
                                 state.viewport, state.frame);
@@ -3365,7 +3366,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     result.appendFormat("%s\n",
             eglQueryStringImplementationANDROID(mEGLDisplay, EGL_EXTENSIONS));
 
-    mRenderEngine->dump(result);
+    getBE().mRenderEngine->dump(result);
 
     hw->undefinedRegion.dump(result, "undefinedRegion");
     result.appendFormat("  orientation=%d, isDisplayOn=%d\n",
