@@ -108,12 +108,8 @@ cc_library {
     ],
     product_variables: {
         binder32bit: {
-            cflags: ["-DBINDER_IPC_32BIT=1"],
-        },
-        lineage: {
-            disable_ashmem_tracking: {
-                cflags: ["-DDISABLE_ASHMEM_TRACKING"],
-            },
+            cflags: ["-DBINDER_IPC_32BIT=1",
+               "-DDISABLE_ASHMEM_TRACKING"],
         },
     },
 
