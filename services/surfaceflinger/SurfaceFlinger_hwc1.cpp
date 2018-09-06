@@ -26,8 +26,6 @@
 
 #include <mutex>
 
-#include <EGL/egl.h>
-
 #include <cutils/properties.h>
 #include <log/log.h>
 
@@ -100,8 +98,6 @@
  * black pixels.
  */
 #define DEBUG_SCREENSHOTS   false
-
-extern "C" EGLAPI const char* eglQueryStringImplementationANDROID(EGLDisplay dpy, EGLint name);
 
 namespace android {
 // ---------------------------------------------------------------------------
@@ -229,9 +225,6 @@ void SurfaceFlinger::onFirstRef()
 
 SurfaceFlinger::~SurfaceFlinger()
 {
-    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-    eglTerminate(display);
 }
 
 void SurfaceFlinger::binderDied(const wp<IBinder>& /* who */)
@@ -533,10 +526,6 @@ void SurfaceFlinger::init() {
 
     Mutex::Autolock _l(mStateLock);
 
-    // initialize EGL for the default display
-    mEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglInitialize(mEGLDisplay, NULL, NULL);
-
     // start the EventThread
     mEventThreadSource = std::make_unique<DispSyncSource>(
             &mPrimaryDispSync, vsyncPhaseOffsetNs, true, "app");
@@ -554,14 +543,8 @@ void SurfaceFlinger::init() {
             *static_cast<HWComposer::EventHandler *>(this)));
 
     // get a RenderEngine for the given display / config (can't fail)
-    getBE().mRenderEngine = RE::impl::RenderEngine::create(mEGLDisplay,
-            getBE().mHwc->getVisualID(), 0);
-
-    // retrieve the EGL context that was selected/created
-    mEGLContext = getBE().mRenderEngine->getEGLContext();
-
-    LOG_ALWAYS_FATAL_IF(mEGLContext == EGL_NO_CONTEXT,
-            "couldn't create EGLContext");
+    getBE().mRenderEngine = RE::impl::RenderEngine::create(getBE().mHwc->getVisualID(), 0);
+    LOG_ALWAYS_FATAL_IF(getBE().mRenderEngine == nullptr, "couldn't create RenderEngine");
 
     // initialize our non-virtual displays
     for (size_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
@@ -582,8 +565,7 @@ void SurfaceFlinger::init() {
             int32_t hwcId = allocateHwcDisplayId(type);
             sp<DisplayDevice> hw = new DisplayDevice(this,
                     type, hwcId, getBE().mHwc->getFormat(hwcId), isSecure, token,
-                    fbs, producer,
-                    getBE().mRenderEngine->getEGLConfig(), false);
+                    fbs, producer, false);
             if (i > DisplayDevice::DISPLAY_PRIMARY) {
                 // FIXME: currently we don't get blank/unblank requests
                 // for displays other than the main display, so we always
@@ -597,7 +579,7 @@ void SurfaceFlinger::init() {
 
     // make the GLContext current so that we can create textures when creating Layers
     // (which may happens before we render something)
-    getDefaultDisplayDeviceLocked()->makeCurrent(mEGLDisplay, mEGLContext);
+    getDefaultDisplayDeviceLocked()->makeCurrent();
 
     mEventControlThread = std::make_unique<EventControlThread>([this](bool enabled) {
         (void)this;
@@ -1574,7 +1556,7 @@ void SurfaceFlinger::postFramebuffer()
             // EGL spec says:
             //   "surface must be bound to the calling thread's current context,
             //    for the current rendering API."
-            getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext);
+            getDefaultDisplayDevice()->makeCurrent();
         }
         hwc.commit();
     }
@@ -1583,7 +1565,7 @@ void SurfaceFlinger::postFramebuffer()
     // deal with dequeueBuffer() being called outside of the composition loop; however
     // the code below can call glFlush() which is allowed (and does in some case) call
     // dequeueBuffer().
-    getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext);
+    getDefaultDisplayDevice()->makeCurrent();
 
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         sp<const DisplayDevice> hw(mDisplays[dpy]);
@@ -1693,7 +1675,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         // be sure that nothing associated with this display
                         // is current.
                         const sp<const DisplayDevice> defaultDisplay(getDefaultDisplayDeviceLocked());
-                        defaultDisplay->makeCurrent(mEGLDisplay, mEGLContext);
+                        defaultDisplay->makeCurrent();
                         sp<DisplayDevice> hw(getDisplayDeviceLocked(draw.keyAt(i)));
                         if (hw != NULL)
                             hw->disconnect(getHwComposer());
@@ -2238,11 +2220,11 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 
     bool hasGlesComposition = hwc.hasGlesComposition(id);
     if (hasGlesComposition) {
-        if (!hw->makeCurrent(mEGLDisplay, mEGLContext)) {
+        if (!hw->makeCurrent()) {
             ALOGW("DisplayDevice::makeCurrent failed. Aborting surface composition for display %s",
                   hw->getDisplayName().string());
-            eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-            if(!getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext)) {
+            getRenderEngine().resetCurrentSurface();
+            if(!getDefaultDisplayDevice()->makeCurrent()) {
               ALOGE("DisplayDevice::makeCurrent on default display failed. Aborting.");
             }
             return false;
@@ -3373,13 +3355,6 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     HWComposer& hwc(getHwComposer());
     sp<const DisplayDevice> hw(getDefaultDisplayDeviceLocked());
 
-    colorizer.bold(result);
-    result.appendFormat("EGL implementation : %s\n",
-            eglQueryStringImplementationANDROID(mEGLDisplay, EGL_VERSION));
-    colorizer.reset(result);
-    result.appendFormat("%s\n",
-            eglQueryStringImplementationANDROID(mEGLDisplay, EGL_EXTENSIONS));
-
     getBE().mRenderEngine->dump(result);
 
     hw->undefinedRegion.dump(result, "undefinedRegion");
@@ -4029,84 +4004,43 @@ status_t SurfaceFlinger::captureScreenImplLocked(const RenderArea& renderArea,
             result = native_window_dequeue_buffer_and_wait(window,  &buffer);
             if (result == NO_ERROR) {
                 int syncFd = -1;
-                // create an EGLImage from the buffer so we can later
-                // turn it into a texture
-                EGLImageKHR image = eglCreateImageKHR(mEGLDisplay, EGL_NO_CONTEXT,
-                        EGL_NATIVE_BUFFER_ANDROID, buffer, NULL);
-                if (image != EGL_NO_IMAGE_KHR) {
-                    // this binds the given EGLImage as a framebuffer for the
-                    // duration of this scope.
-                    RE::RenderEngine::BindImageAsFramebuffer imageBond(getRenderEngine(), image);
-                    if (imageBond.getStatus() == NO_ERROR) {
-                        // this will in fact render into our dequeued buffer
-                        // via an FBO, which means we didn't have to create
-                        // an EGLSurface and therefore we're not
-                        // dependent on the context's EGLConfig.
-                        renderScreenImplLocked(renderArea, traverseLayers, true, useIdentityTransform);
 
-                        // Attempt to create a sync khr object that can produce a sync point. If that
-                        // isn't available, create a non-dupable sync object in the fallback path and
-                        // wait on it directly.
-                        EGLSyncKHR sync;
-                        if (!DEBUG_SCREENSHOTS) {
-                           sync = eglCreateSyncKHR(mEGLDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
-                           // native fence fd will not be populated until flush() is done.
-                           getRenderEngine().flush();
-                        } else {
-                            sync = EGL_NO_SYNC_KHR;
-                        }
-                        if (sync != EGL_NO_SYNC_KHR) {
-                            // get the sync fd
-                            syncFd = eglDupNativeFenceFDANDROID(mEGLDisplay, sync);
-                            if (syncFd == EGL_NO_NATIVE_FENCE_FD_ANDROID) {
-                                ALOGW("captureScreen: failed to dup sync khr object");
-                                syncFd = -1;
-                            }
-                            eglDestroySyncKHR(mEGLDisplay, sync);
-                        } else {
-                            // fallback path
-                            sync = eglCreateSyncKHR(mEGLDisplay, EGL_SYNC_FENCE_KHR, NULL);
-                            if (sync != EGL_NO_SYNC_KHR) {
-                                EGLint result = eglClientWaitSyncKHR(mEGLDisplay, sync,
-                                    EGL_SYNC_FLUSH_COMMANDS_BIT_KHR, 2000000000 /*2 sec*/);
-                                EGLint eglErr = eglGetError();
-                                if (result == EGL_TIMEOUT_EXPIRED_KHR) {
-                                    ALOGW("captureScreen: fence wait timed out");
-                                } else {
-                                    ALOGW_IF(eglErr != EGL_SUCCESS,
-                                            "captureScreen: error waiting on EGL fence: %#x", eglErr);
-                                }
-                                eglDestroySyncKHR(mEGLDisplay, sync);
-                            } else {
-                                ALOGW("captureScreen: error creating EGL fence: %#x", eglGetError());
-                            }
-                        }
-                        if (DEBUG_SCREENSHOTS) {
-                            uint32_t* pixels = new uint32_t[renderArea.getReqWidth() *
-                                                            renderArea.getReqHeight()];
-                            getRenderEngine().readPixels(0, 0, renderArea.getReqWidth(),
-                                                         renderArea.getReqHeight(), pixels);
-                            checkScreenshot(renderArea.getReqWidth(), renderArea.getReqHeight(),
-                                            renderArea.getReqWidth(), pixels, traverseLayers);
-                            delete [] pixels;
-                        }
+                // this binds the given EGLImage as a framebuffer for the
+                // duration of this scope.
+                RenderEngine::BindNativeBufferAsFramebuffer bufferBond(getRenderEngine(), buffer);
+                if (bufferBond.getStatus() != NO_ERROR) {
+                     ALOGE("got ANWB binding error while taking screenshot");
+                     // this will in fact render into our dequeued buffer
+                     // via an FBO, which means we didn't have to create
+                     // an EGLSurface and therefore we're not
+                     // dependent on the context's EGLConfig.
+                     renderScreenImplLocked(renderArea, traverseLayers, true, useIdentityTransform);
 
-                    } else {
-                        ALOGE("got GL_FRAMEBUFFER_COMPLETE_OES error while taking screenshot");
-                        result = INVALID_OPERATION;
-                        window->cancelBuffer(window, buffer, syncFd);
-                        buffer = NULL;
-                    }
-                    // destroy our image
-                    eglDestroyImageKHR(mEGLDisplay, image);
-                } else {
-                    result = BAD_VALUE;
-                }
-                if (buffer) {
-                    // queueBuffer takes ownership of syncFd
-                    result = window->queueBuffer(window, buffer, syncFd);
-                }
-            }
+                     syncFd = getRenderEngine().flush(DEBUG_SCREENSHOTS);
+
+                     if (DEBUG_SCREENSHOTS) {
+                         uint32_t* pixels = new uint32_t[renderArea.getReqWidth() *
+                                                         renderArea.getReqHeight()];
+                         getRenderEngine().readPixels(0, 0, renderArea.getReqWidth(),
+                                                      renderArea.getReqHeight(), pixels);
+                         checkScreenshot(renderArea.getReqWidth(), renderArea.getReqHeight(),
+                                         renderArea.getReqWidth(), pixels, traverseLayers);
+                         delete [] pixels;
+                     }
+
+                 } else {
+                     ALOGE("got GL_FRAMEBUFFER_COMPLETE_OES error while taking screenshot");
+                     result = INVALID_OPERATION;
+                     window->cancelBuffer(window, buffer, syncFd);
+                     buffer = NULL;
+                 }
+             } else {
+                 result = BAD_VALUE;
+             }
+             if (buffer) {
+                 // queueBuffer takes ownership of syncFd
+                 result = window->queueBuffer(window, buffer, syncFd);
+             }
         } else {
             result = BAD_VALUE;
         }
