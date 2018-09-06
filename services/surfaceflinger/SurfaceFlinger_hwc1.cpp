@@ -1228,7 +1228,7 @@ void SurfaceFlinger::doDebugFlashRegions()
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
             if (!dirtyRegion.isEmpty()) {
                 // redraw the whole screen
-                doComposeSurfaces(hw, Region(hw->bounds()));
+                doComposeSurfaces(hw);
 
                 // and draw the dirty region
                 const int32_t height = hw->getHeight();
@@ -1578,8 +1578,7 @@ void SurfaceFlinger::doComposition() {
             doDisplayComposition(hw, dirtyRegion);
 
             hw->dirtyRegion.clear();
-            hw->flip(hw->swapRegion);
-            hw->swapRegion.clear();
+            hw->flip();
         }
         // inform the h/w that we're done compositing
         hw->compositionComplete();
@@ -2221,33 +2220,8 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         return;
     }
 
-    Region dirtyRegion(inDirtyRegion);
-
-    // compute the invalid region
-    hw->swapRegion.orSelf(dirtyRegion);
-
-    uint32_t flags = hw->getFlags();
-    if (flags & DisplayDevice::SWAP_RECTANGLE) {
-        // we can redraw only what's dirty, but since SWAP_RECTANGLE only
-        // takes a rectangle, we must make sure to update that whole
-        // rectangle in that case
-        dirtyRegion.set(hw->swapRegion.bounds());
-    } else {
-        if (flags & DisplayDevice::PARTIAL_UPDATES) {
-            // We need to redraw the rectangle that will be updated
-            // (pushed to the framebuffer).
-            // This is needed because PARTIAL_UPDATES only takes one
-            // rectangle instead of a region (see DisplayDevice::flip())
-            dirtyRegion.set(hw->swapRegion.bounds());
-        } else {
-            // we need to redraw everything (the whole screen)
-            dirtyRegion.set(hw->bounds());
-            hw->swapRegion = dirtyRegion;
-        }
-    }
-
     if (CC_LIKELY(!mDaltonize)) {
-        if (!doComposeSurfaces(hw, dirtyRegion)) return;
+        if (!doComposeSurfaces(hw)) return;
     } else {
         auto& engine(getRenderEngine());
         mat4 colorMatrix = mColorMatrix;
@@ -2255,19 +2229,17 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
             colorMatrix = colorMatrix * mDaltonizer();
         }
         mat4 oldMatrix = engine.setupColorTransform(colorMatrix);
-        doComposeSurfaces(hw, dirtyRegion);
+        doComposeSurfaces(hw);
         engine.setupColorTransform(oldMatrix);
     }
-
-    // update the swap region and clear the dirty region
-    hw->swapRegion.orSelf(dirtyRegion);
 
     // swap buffers (presentation)
     hw->swapBuffers(getHwComposer());
 }
 
-bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const Region& dirty)
+bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw)
 {
+    const Region bounds(hw->bounds());
     DisplayRenderArea renderArea(hw);
 
     auto& engine(getRenderEngine());
@@ -2301,16 +2273,13 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
             // we start with the whole screen area
             const Region bounds(hw->getBounds());
 
-            // we remove the scissor part
+            // we start with the whole screen area and remove the scissor part
             // we're left with the letterbox region
             // (common case is that letterbox ends-up being empty)
             const Region letterbox(bounds.subtract(hw->getScissor()));
 
             // compute the area to clear
             Region region(hw->undefinedRegion.merge(letterbox));
-
-            // but limit it to the dirty region
-            region.andSelf(dirty);
 
             // screen is already cleared here
             if (!region.isEmpty()) {
@@ -2349,7 +2318,7 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
         // we're using h/w composer
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<Layer>& layer(layers[i]);
-            const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
+            const Region clip(bounds.intersect(tr.transform(layer->visibleRegion)));
             if (!clip.isEmpty()) {
                 switch (cur->getCompositionType()) {
                     case HWC_CURSOR_OVERLAY:
@@ -2383,7 +2352,7 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
         // we're not using h/w composer
         for (size_t i=0 ; i<count ; ++i) {
             const sp<Layer>& layer(layers[i]);
-            const Region clip(dirty.intersect(
+            const Region clip(bounds.intersect(
                     tr.transform(layer->visibleRegion)));
             if (!clip.isEmpty()) {
                 layer->draw(renderArea, clip);
