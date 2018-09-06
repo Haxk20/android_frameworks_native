@@ -127,6 +127,32 @@ std::string getHwcServiceName() {
     return std::string(value);
 }
 
+NativeWindowSurface::~NativeWindowSurface() = default;
+
+namespace impl {
+
+class NativeWindowSurface final : public android::NativeWindowSurface {
+public:
+    static std::unique_ptr<android::NativeWindowSurface> create(
+            const sp<IGraphicBufferProducer>& producer) {
+        return std::make_unique<NativeWindowSurface>(producer);
+    }
+
+    explicit NativeWindowSurface(const sp<IGraphicBufferProducer>& producer)
+          : surface(new Surface(producer, false)) {}
+
+    ~NativeWindowSurface() override = default;
+
+private:
+    sp<ANativeWindow> getNativeWindow() const override { return surface; }
+
+    void preallocateBuffers() override { surface->allocateBuffers(); }
+
+    sp<Surface> surface;
+};
+
+} // namespace impl
+
 SurfaceFlingerBE::SurfaceFlingerBE()
       : mHwcServiceName(getHwcServiceName()),
         mRenderEngine(nullptr),
@@ -163,7 +189,8 @@ SurfaceFlinger::SurfaceFlinger()
         mHWVsyncAvailable(false),
         mDaltonize(false),
         mHasPoweredOff(false),
-        mNumLayers(0)
+        mNumLayers(0),
+        mCreateNativeWindowSurface(&impl::NativeWindowSurface::create)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -560,12 +587,29 @@ void SurfaceFlinger::init() {
             sp<IGraphicBufferConsumer> consumer;
             BufferQueue::createBufferQueue(&producer, &consumer);
 
+            auto nativeWindowSurface = mCreateNativeWindowSurface(producer);
+            auto nativeWindow = nativeWindowSurface->getNativeWindow();
+
+            /*
+             * Create our display's surface
+             */
+            std::unique_ptr<RE::Surface> renderSurface = getRenderEngine().createSurface();
+            renderSurface->setCritical(i == DisplayDevice::DISPLAY_PRIMARY);
+            renderSurface->setAsync(i >= DisplayDevice::DISPLAY_VIRTUAL);
+            renderSurface->setNativeWindow(nativeWindow.get());
+            const int displayWidth = renderSurface->queryWidth();
+            const int displayHeight = renderSurface->queryHeight();
+            // virtual displays are always considered enabled
+            auto initialPowerMode = (i >= DisplayDevice::DISPLAY_VIRTUAL) ? HWC_POWER_MODE_NORMAL
+                                                                           : HWC_POWER_MODE_OFF;
+
             sp<FramebufferSurface> fbs = new FramebufferSurface(*getBE().mHwc, i,
                     consumer);
             int32_t hwcId = allocateHwcDisplayId(type);
+
             sp<DisplayDevice> hw = new DisplayDevice(this,
-                    type, hwcId, getBE().mHwc->getFormat(hwcId), isSecure, token,
-                    fbs, producer, false);
+                    type, hwcId, getBE().mHwc->getFormat(hwcId), isSecure, token, nativeWindow,
+                    fbs, std::move(renderSurface), displayWidth, displayHeight, initialPowerMode);
             if (i > DisplayDevice::DISPLAY_PRIMARY) {
                 // FIXME: currently we don't get blank/unblank requests
                 // for displays other than the main display, so we always
@@ -1781,13 +1825,27 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         producer = bqProducer;
                     }
 
+                    auto nativeWindowSurface = mCreateNativeWindowSurface(producer);
+                    auto nativeWindow = nativeWindowSurface->getNativeWindow();
+
+                    /*
+                     * Create our display's surface
+                     */
+                    std::unique_ptr<RE::Surface> renderSurface = getRenderEngine().createSurface();
+                    renderSurface->setCritical(state.type == DisplayDevice::DISPLAY_PRIMARY);
+                    renderSurface->setAsync(state.type >= DisplayDevice::DISPLAY_VIRTUAL);
+                    renderSurface->setNativeWindow(nativeWindow.get());
+                    const int displayWidth = renderSurface->queryWidth();
+                    const int displayHeight = renderSurface->queryHeight();
+                    // virtual displays are always considered enabled
+                    auto initialPowerMode = (state.type >= DisplayDevice::DISPLAY_VIRTUAL) ? HWC_POWER_MODE_NORMAL
+                                                                           : HWC_POWER_MODE_OFF;
                     const wp<IBinder>& display(curr.keyAt(i));
                     if (dispSurface != NULL) {
                         sp<DisplayDevice> hw = new DisplayDevice(this,
                                 state.type, hwcDisplayId,
                                 getBE().mHwc->getFormat(hwcDisplayId), state.isSecure,
-                                display, dispSurface, producer,
-                                getBE().mRenderEngine->getEGLConfig(), false);
+                                display, dispSurface, std::move(renderSurface), displayWidth, displayHeight, initialPowerMode);
                         hw->setLayerStack(state.layerStack);
                         hw->setProjection(state.orientation,
                                 state.viewport, state.frame);
