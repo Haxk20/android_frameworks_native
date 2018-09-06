@@ -1129,7 +1129,7 @@ void SurfaceFlinger::onVSyncReceived(HWComposer* /*composer*/, int type,
 }
 
 void SurfaceFlinger::getCompositorTiming(CompositorTiming* compositorTiming) {
-    std::lock_guard<std::mutex> lock(.getBE().mCompositorTimingLock);
+    std::lock_guard<std::mutex> lock(getBE().mCompositorTimingLock);
     *compositorTiming = getBE().mCompositorTiming;
 }
 
@@ -1321,7 +1321,7 @@ void SurfaceFlinger::setCompositorTimingSnapped(nsecs_t vsyncPhase,
     nsecs_t snappedCompositeToPresentLatency = (extraVsyncs > 0) ?
             idealLatency + (extraVsyncs * vsyncInterval) : idealLatency;
 
-    std::lock_guard<std::mutex> lock(.getBE().mCompositorTimingLock);
+    std::lock_guard<std::mutex> lock(getBE().mCompositorTimingLock);
     getBE().mCompositorTiming.deadline = vsyncPhase - idealLatency;
     getBE().mCompositorTiming.interval = vsyncInterval;
     getBE().mCompositorTiming.presentLatency = snappedCompositeToPresentLatency;
@@ -1357,7 +1357,7 @@ void SurfaceFlinger::postComposition(nsecs_t refreshStartTime)
         vsyncPhase, vsyncInterval, refreshStartTime, retireFenceTime);
     CompositorTiming compositorTiming;
     {
-        std::lock_guard<std::mutex> lock(.getBE().mCompositorTimingLock);
+        std::lock_guard<std::mutex> lock(getBE().mCompositorTimingLock);
         compositorTiming = getBE().mCompositorTiming;
     }
 
@@ -1411,10 +1411,10 @@ void SurfaceFlinger::postComposition(nsecs_t refreshStartTime)
         nsecs_t period = mPrimaryDispSync.getPeriod();
         nsecs_t elapsedTime = currentTime - getBE().mLastSwapTime;
         size_t numPeriods = static_cast<size_t>(elapsedTime / period);
-        if (numPeriods < NUM_BUCKETS - 1) {
+        if (numPeriods < SurfaceFlingerBE::NUM_BUCKETS - 1) {
             getBE().mFrameBuckets[numPeriods] += elapsedTime;
         } else {
-            getBE().mFrameBuckets[NUM_BUCKETS - 1] += elapsedTime;
+            getBE().mFrameBuckets[SurfaceFlingerBE::NUM_BUCKETS - 1] += elapsedTime;
         }
         getBE().mTotalTime += elapsedTime;
     }
@@ -1505,7 +1505,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize) {
                                 cur->setSkip(true);
                             }
                         }
@@ -2246,7 +2246,7 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize && !mHasColorMatrix)) {
+    if (CC_LIKELY(!mDaltonize)) {
         if (!doComposeSurfaces(hw, dirtyRegion)) return;
     } else {
         auto& engine(getRenderEngine());
@@ -3240,18 +3240,18 @@ void SurfaceFlinger::appendSfConfigString(String8& result) const
 void SurfaceFlinger::dumpStaticScreenStats(String8& result) const
 {
     result.appendFormat("Static screen stats:\n");
-    for (size_t b = 0; b < NUM_BUCKETS - 1; ++b) {
+    for (size_t b = 0; b < SurfaceFlingerBE::NUM_BUCKETS - 1; ++b) {
         float bucketTimeSec = getBE().mFrameBuckets[b] / 1e9;
         float percent = 100.0f *
                 static_cast<float>(getBE().mFrameBuckets[b]) / getBE().mTotalTime;
         result.appendFormat("  < %zd frames: %.3f s (%.1f%%)\n",
                 b + 1, bucketTimeSec, percent);
     }
-    float bucketTimeSec = getBE().mFrameBuckets[NUM_BUCKETS - 1] / 1e9;
+    float bucketTimeSec = getBE().mFrameBuckets[SurfaceFlingerBE::NUM_BUCKETS - 1] / 1e9;
     float percent = 100.0f *
-            static_cast<float>(getBE().mFrameBuckets[NUM_BUCKETS - 1]) / getBE().mTotalTime;
+            static_cast<float>(getBE().mFrameBuckets[SurfaceFlingerBE::NUM_BUCKETS - 1]) / getBE().mTotalTime;
     result.appendFormat("  %zd+ frames: %.3f s (%.1f%%)\n",
-            NUM_BUCKETS - 1, bucketTimeSec, percent);
+            SurfaceFlingerBE::NUM_BUCKETS - 1, bucketTimeSec, percent);
 }
 
 void SurfaceFlinger::dumpFrameEventsLocked(String8& result) {
@@ -3454,8 +3454,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     colorizer.reset(result);
     result.appendFormat("  h/w composer %s and %s\n",
             hwc.initCheck()==NO_ERROR ? "present" : "not present",
-                    (mDebugDisableHWC || mDebugRegion || mDaltonize
-                            || mHasColorMatrix) ? "disabled" : "enabled");
+                    (mDebugDisableHWC || mDebugRegion || mDaltonize) ? "disabled" : "enabled");
     hwc.dump(result);
 
     /*
@@ -3653,7 +3652,6 @@ status_t SurfaceFlinger::onTransact(
             case 1015: {
                 // apply a color matrix
                 n = data.readInt32();
-                mHasColorMatrix = n ? 1 : 0;
                 if (n) {
                     // color matrix is sent as mat3 matrix followed by vec3
                     // offset, then packed into a mat4 where the last row is
