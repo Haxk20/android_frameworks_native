@@ -188,6 +188,7 @@ SurfaceFlinger::SurfaceFlinger()
         mPrimaryHWVsyncEnabled(false),
         mHWVsyncAvailable(false),
         mDaltonize(false),
+        mHasColorMatrix(false),
         mHasPoweredOff(false),
         mNumLayers(0),
         mCreateNativeWindowSurface(&impl::NativeWindowSurface::create)
