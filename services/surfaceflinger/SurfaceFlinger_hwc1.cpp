@@ -688,7 +688,7 @@ bool SurfaceFlinger::authenticateSurfaceTexture(
 bool SurfaceFlinger::authenticateSurfaceTextureLocked(
         const sp<IGraphicBufferProducer>& bufferProducer) const {
     sp<IBinder> surfaceTextureBinder(IInterface::asBinder(bufferProducer));
-    return mGraphicBufferProducerList.indexOf(surfaceTextureBinder) >= 0;
+    return mGraphicBufferProducerList.count(surfaceTextureBinder.get()) > 0;
 }
 
 status_t SurfaceFlinger::getSupportedFrameTimestamps(
@@ -2394,7 +2394,9 @@ status_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
             parent->addChild(lbc);
         }
 
-        mGraphicBufferProducerList.add(IInterface::asBinder(gbc));
+        mGraphicBufferProducerList.insert(IInterface::asBinder(gbc).get());
+        LOG_ALWAYS_FATAL_IF(mGraphicBufferProducerList.size() > MAX_LAYERS,
+                            "Suspected IGBP leak");
         mLayersAdded = true;
         mNumLayers++;
     }
