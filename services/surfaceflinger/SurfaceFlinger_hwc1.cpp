@@ -535,9 +535,7 @@ public:
 
     virtual void onInjectSyncEvent(nsecs_t when) {
         std::lock_guard<std::mutex> lock(mCallbackMutex);
-        if (mCallback) {
-            mCallback->onVSyncEvent(when);
-        }
+        mCallback->onVSyncEvent(when);
     }
 
     virtual void setVSyncEnabled(bool) {}
@@ -946,38 +944,30 @@ status_t SurfaceFlinger::getHdrCapabilities(const sp<IBinder>& /*display*/,
 }
 
 status_t SurfaceFlinger::enableVSyncInjections(bool enable) {
-    sp<LambdaMessage> enableVSyncInjections = new LambdaMessage([&]() {
-        Mutex::Autolock _l(mStateLock);
+    if (enable == mInjectVSyncs) {
+        return NO_ERROR;
+    }
 
-        if (mInjectVSyncs == enable) {
-            return;
-        }
-
-        if (enable) {
-            ALOGV("VSync Injections enabled");
-            if (mVSyncInjector.get() == nullptr) {
-                mVSyncInjector = std::make_unique<InjectVSyncSource>();
-                mInjectorEventThread = std::make_unique<
-                        impl::EventThread>(mVSyncInjector.get(),
-                                           [this]() { resyncWithRateLimit(); },
-                                           impl::EventThread::InterceptVSyncsCallback(),
-                                           "injEventThread");
-            }
-            mEventQueue->setEventThread(mInjectorEventThread.get());
-        } else {
-            ALOGV("VSync Injections disabled");
-            mEventQueue->setEventThread(mSFEventThread.get());
-        }
-
+    if (enable) {
         mInjectVSyncs = enable;
-    });
-    postMessageSync(enableVSyncInjections);
+        ALOGV("VSync Injections enabled");
+        if (mVSyncInjector.get() == nullptr) {
+                mVSyncInjector = std::make_unique<InjectVSyncSource>();
+                mInjectorEventThread =
+                        std::make_unique<impl::EventThread>(mVSyncInjector.get(), *this, false,
+                                                            "injEventThread");
+        }
+        mEventQueue->setEventThread(mInjectorEventThread.get());
+    } else {
+        mInjectVSyncs = enable;
+        ALOGV("VSync Injections disabled");
+        mEventQueue->setEventThread(mSFEventThread.get());
+        mVSyncInjector.clear();
+    }
     return NO_ERROR;
 }
 
 status_t SurfaceFlinger::injectVSync(nsecs_t when) {
-    Mutex::Autolock _l(mStateLock);
-
     if (!mInjectVSyncs) {
         ALOGE("VSync Injections not enabled");
         return BAD_VALUE;
@@ -3533,8 +3523,6 @@ status_t SurfaceFlinger::onTransact(
         case GET_ANIMATION_FRAME_STATS:
         case SET_POWER_MODE:
         case GET_HDR_CAPABILITIES:
-        case ENABLE_VSYNC_INJECTIONS:
-        case INJECT_VSYNC:
         {
             // codes that require permission check
             IPCThreadState* ipc = IPCThreadState::self();
