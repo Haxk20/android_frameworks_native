@@ -3148,7 +3148,7 @@ status_t SurfaceFlinger::doDump(int fd, const Vector<String16>& args, bool asPro
 
             if ((index < numArgs) && (args[index] == String16("--proto"))) {
                 index++;
-                LayersProto layersProto = dumpProtoInfo();
+                LayersProto layersProto = dumpProtoInfo(LayerVector::StateSet::Current);
                 result.append(layersProto.SerializeAsString().c_str(), layersProto.ByteSize());
                 dumpAll = false;
             }
@@ -3321,11 +3321,13 @@ void SurfaceFlinger::dumpBufferingStats(String8& result) const {
     result.append("\n");
 }
 
-LayersProto SurfaceFlinger::dumpProtoInfo() const {
+LayersProto SurfaceFlinger::dumpProtoInfo(LayerVector::StateSet stateSet) const {
     LayersProto layersProto;
-    mCurrentState.traverseInZOrder([&](Layer* layer) {
+    const bool useDrawing = stateSet == LayerVector::StateSet::Drawing;
+    const State& state = useDrawing ? mDrawingState : mCurrentState;
+    state.traverseInZOrder([&](Layer* layer) {
         LayerProto* layerProto = layersProto.add_layers();
-        layer->writeToProto(layerProto, LayerVector::StateSet::Current);
+        layer->writeToProto(layerProto, stateSet);
     });
 
     return layersProto;
@@ -3391,7 +3393,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     result.appendFormat("Visible layers (count = %zu)\n", mNumLayers);
     colorizer.reset(result);
 
-    LayersProto layersProto = dumpProtoInfo();
+    LayersProto layersProto = dumpProtoInfo(LayerVector::StateSet::Current);
     auto layerTree = LayerProtoParser::generateLayerTree(layersProto);
     result.append(LayerProtoParser::layersToString(layerTree).c_str());
 
