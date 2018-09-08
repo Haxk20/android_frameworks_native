@@ -89,18 +89,6 @@ BufferLayer::~BufferLayer() {
 #endif
 }
 
-void BufferLayer::useSurfaceDamage() {
-    if (mFlinger->mForceFullDamage) {
-        surfaceDamageRegion = Region::INVALID_REGION;
-    } else {
-        surfaceDamageRegion = mConsumer->getSurfaceDamage();
-    }
-}
-
-void BufferLayer::useEmptyDamage() {
-    surfaceDamageRegion.clear();
-}
-
 bool BufferLayer::isProtected() const {
     const sp<GraphicBuffer>& buffer(getBE().compositionInfo.mBuffer);
     return (buffer != 0) &&
@@ -257,51 +245,6 @@ void BufferLayer::onDraw(const RenderArea& renderArea, const Region& clip,
     engine.disableTexturing();
 }
 
-#ifdef USE_HWC2
-void BufferLayer::onLayerDisplayed(const sp<Fence>& releaseFence) {
-    mConsumer->setReleaseFence(releaseFence);
-}
-#else
-void BufferLayer::onLayerDisplayed(const sp<const DisplayDevice>& /*hw*/,
-                                   HWComposer::HWCLayerInterface* layer) {
-    if (layer) {
-        layer->onDisplayed();
-        mConsumer->setReleaseFence(layer->getAndResetReleaseFence());
-    }
-}
-#endif
-
-void BufferLayer::abandon() {
-    mConsumer->abandon();
-}
-
-bool BufferLayer::shouldPresentNow(const DispSync& dispSync) const {
-    if (mSidebandStreamChanged || mAutoRefresh) {
-        return true;
-    }
-
-    Mutex::Autolock lock(mQueueItemLock);
-    if (mQueueItems.empty()) {
-        return false;
-    }
-    auto timestamp = mQueueItems[0].mTimestamp;
-    nsecs_t expectedPresent = mConsumer->computeExpectedPresent(dispSync);
-
-    // Ignore timestamps more than a second in the future
-    bool isPlausible = timestamp < (expectedPresent + s2ns(1));
-    ALOGW_IF(!isPlausible,
-             "[%s] Timestamp %" PRId64 " seems implausible "
-             "relative to expectedPresent %" PRId64,
-             mName.string(), timestamp, expectedPresent);
-
-    bool isDue = timestamp < expectedPresent;
-    return isDue || !isPlausible;
-}
-
-void BufferLayer::setTransformHint(uint32_t orientation) const {
-    mConsumer->setTransformHint(orientation);
-}
-
 bool BufferLayer::onPreComposition(nsecs_t refreshStartTime) {
     if (mBufferLatched) {
         Mutex::Autolock lock(mFrameEventHistoryMutex);
@@ -311,66 +254,6 @@ bool BufferLayer::onPreComposition(nsecs_t refreshStartTime) {
     mRefreshPending = false;
     return mQueuedFrames > 0 || mSidebandStreamChanged ||
             mAutoRefresh;
-}
-bool BufferLayer::onPostComposition(const std::shared_ptr<FenceTime>& glDoneFence,
-                                    const std::shared_ptr<FenceTime>& presentFence,
-                                    const CompositorTiming& compositorTiming) {
-    // mFrameLatencyNeeded is true when a new frame was latched for the
-    // composition.
-    if (!mFrameLatencyNeeded) return false;
-
-    // Update mFrameEventHistory.
-    {
-        Mutex::Autolock lock(mFrameEventHistoryMutex);
-        mFrameEventHistory.addPostComposition(mCurrentFrameNumber, glDoneFence,
-                                              presentFence, compositorTiming);
-    }
-
-    // Update mFrameTracker.
-    nsecs_t desiredPresentTime = mConsumer->getTimestamp();
-    mFrameTracker.setDesiredPresentTime(desiredPresentTime);
-
-    const std::string layerName(getName().c_str());
-    mTimeStats.setDesiredTime(layerName, mCurrentFrameNumber, desiredPresentTime);
-
-    std::shared_ptr<FenceTime> frameReadyFence = mConsumer->getCurrentFenceTime();
-    if (frameReadyFence->isValid()) {
-        mFrameTracker.setFrameReadyFence(std::move(frameReadyFence));
-    } else {
-        // There was no fence for this frame, so assume that it was ready
-        // to be presented at the desired present time.
-        mFrameTracker.setFrameReadyTime(desiredPresentTime);
-    }
-
-    if (presentFence->isValid()) {
-        mTimeStats.setPresentFence(layerName, mCurrentFrameNumber, presentFence);
-        mFrameTracker.setActualPresentFence(std::shared_ptr<FenceTime>(presentFence));
-    } else {
-        // The HWC doesn't support present fences, so use the refresh
-        // timestamp instead.
-        const nsecs_t actualPresentTime =
-                mFlinger->getHwComposer().getRefreshTimestamp(HWC_DISPLAY_PRIMARY);
-        mTimeStats.setPresentTime(layerName, mCurrentFrameNumber, actualPresentTime);
-        mFrameTracker.setActualPresentTime(actualPresentTime);
-    }
-
-    mFrameTracker.advanceFrame();
-    mFrameLatencyNeeded = false;
-    return true;
-}
-
-std::vector<OccupancyTracker::Segment> BufferLayer::getOccupancyHistory(bool forceFlush) {
-    std::vector<OccupancyTracker::Segment> history;
-    status_t result = mConsumer->getOccupancyHistory(forceFlush, &history);
-    if (result != NO_ERROR) {
-        ALOGW("[%s] Failed to obtain occupancy history (%d)", mName.string(), result);
-        return {};
-    }
-    return history;
-}
-
-bool BufferLayer::getTransformToDisplayInverse() const {
-    return mConsumer->getTransformToDisplayInverse();
 }
 
 #ifdef USE_HWC2
@@ -637,10 +520,6 @@ Region BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime
     return outDirtyRegion;
 }
 
-void BufferLayer::setDefaultBufferSize(uint32_t w, uint32_t h) {
-    mConsumer->setDefaultBufferSize(w, h);
-}
-
 #ifdef USE_HWC2
 void BufferLayer::setPerFrameData(const sp<const DisplayDevice>& displayDevice) {
     // Apply this display's projection's viewport to the visible region
@@ -716,24 +595,26 @@ void BufferLayer::setPerFrameData(const sp<const DisplayDevice>& displayDevice) 
 }
 
 #else
-void BufferLayer::setAcquireFence(const sp<const DisplayDevice>& /* hw */,
+void BufferLayer::setPerFrameData(const sp<const DisplayDevice>& hw,
                                   HWComposer::HWCLayerInterface& layer) {
-    int fenceFd = -1;
+    // we have to set the visible region on every frame because
+    // we currently free it during onLayerDisplayed(), which is called
+    // after HWComposer::commit() -- every frame.
+    // Apply this display's projection's viewport to the visible region
+    // before giving it to the HWC HAL.
+    const Transform& tr = hw->getTransform();
+    Region visible = tr.transform(visibleRegion.intersect(hw->getViewport()));
+    layer.setVisibleRegionScreen(visible);
+    layer.setSurfaceDamage(surfaceDamageRegion);
+    mIsGlesComposition = (layer.getCompositionType() == HWC_FRAMEBUFFER);
 
-    // TODO: there is a possible optimization here: we only need to set the
-    // acquire fence the first time a new buffer is acquired on EACH display.
-
-    if (layer.getCompositionType() == HWC_OVERLAY ||
-        layer.getCompositionType() == HWC_CURSOR_OVERLAY) {
-        sp<Fence> fence = mConsumer->getCurrentFence();
-        if (fence->isValid()) {
-            fenceFd = fence->dup();
-            if (fenceFd == -1) {
-                ALOGW("failed to dup layer fence, skipping sync: %d", errno);
-            }
-        }
+    if (mSidebandStream.get()) {
+        layer.setSidebandStream(mSidebandStream);
+    } else {
+        // NOTE: buffer can be NULL if the client never drew into this
+        // layer yet, or if we ran out of memory
+        layer.setBuffer(mActiveBuffer);
     }
-    layer.setAcquireFenceFd(fenceFd);
 }
 #endif
 

@@ -34,12 +34,6 @@ public:
                         bool useIdentityTransform) const;
     bool isVisible() const override;
 
-#ifdef USE_HWC2
-    void setPerFrameData(const sp<const DisplayDevice>& displayDevice) override;
-#else
-    void setAcquireFence(const sp<const DisplayDevice>& /*hw*/,
-                         HWComposer::HWCLayerInterface& /*layer*/) override {}
-#endif
 };
 
 } // namespace android
