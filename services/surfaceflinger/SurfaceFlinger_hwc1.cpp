@@ -956,13 +956,17 @@ status_t SurfaceFlinger::enableVSyncInjections(bool enable) {
         if (enable) {
             ALOGV("VSync Injections enabled");
             if (mVSyncInjector.get() == nullptr) {
-                mVSyncInjector = new InjectVSyncSource();
-                mInjectorEventThread = new EventThread(mVSyncInjector, *this, false);
+                mVSyncInjector = std::make_unique<InjectVSyncSource>();
+                mInjectorEventThread = std::make_unique<
+                        impl::EventThread>(mVSyncInjector.get(),
+                                           [this]() { resyncWithRateLimit(); },
+                                           impl::EventThread::InterceptVSyncsCallback(),
+                                           "injEventThread");
             }
-            mEventQueue.setEventThread(mInjectorEventThread);
+            mEventQueue->setEventThread(mInjectorEventThread.get());
         } else {
             ALOGV("VSync Injections disabled");
-            mEventQueue.setEventThread(mSFEventThread);
+            mEventQueue->setEventThread(mSFEventThread.get());
         }
 
         mInjectVSyncs = enable;
@@ -985,7 +989,8 @@ status_t SurfaceFlinger::injectVSync(nsecs_t when) {
     return NO_ERROR;
 }
 
-status_t SurfaceFlinger::getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayers) const {
+status_t SurfaceFlinger::getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayers) const
+        NO_THREAD_SAFETY_ANALYSIS {
     IPCThreadState* ipc = IPCThreadState::self();
     const int pid = ipc->getCallingPid();
     const int uid = ipc->getCallingUid();
@@ -996,8 +1001,8 @@ status_t SurfaceFlinger::getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayer
     }
 
     // Try to acquire a lock for 1s, fail gracefully
-    status_t err = mStateLock.timedLock(s2ns(1));
-    bool locked = (err == NO_ERROR);
+    const status_t err = mStateLock.timedLock(s2ns(1));
+    const bool locked = (err == NO_ERROR);
     if (!locked) {
         ALOGE("LayerDebugInfo: SurfaceFlinger unresponsive (%s [%d]) - exit", strerror(-err), err);
         return TIMED_OUT;
@@ -1005,11 +1010,10 @@ status_t SurfaceFlinger::getLayerDebugInfo(std::vector<LayerDebugInfo>* outLayer
 
     outLayers->clear();
     mCurrentState.traverseInZOrder([&](Layer* layer) {
-            outLayers->push_back(layer->getLayerDebugInfo());
-        });
+        outLayers->push_back(layer->getLayerDebugInfo());
+    });
 
     mStateLock.unlock();
-
     return NO_ERROR;
 }
 
