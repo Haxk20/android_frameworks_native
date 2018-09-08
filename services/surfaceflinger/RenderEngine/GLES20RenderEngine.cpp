@@ -269,8 +269,20 @@ void GLES20RenderEngine::setupLayerBlackedOut() {
     mState.setTexture(texture);
 }
 
-void GLES20RenderEngine::setupColorTransform(const mat4& colorTransform) {
+#ifdef USE_HWC2
+void
+#else
+mat4
+#endif
+GLES20RenderEngine::setupColorTransform(const mat4& colorTransform) {
+#ifndef USE_HWC2
+    mat4 oldTransform = mState.getColorMatrix();
+#endif
+
     mState.setColorMatrix(colorTransform);
+#ifndef USE_HWC2
+    return oldTransform;
+#endif
 }
 
 void GLES20RenderEngine::setSaturationMatrix(const mat4& saturationMatrix) {

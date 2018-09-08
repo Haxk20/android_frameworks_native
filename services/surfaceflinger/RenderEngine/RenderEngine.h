@@ -112,7 +112,11 @@ public:
     virtual void setupLayerBlackedOut() = 0;
     virtual void setupFillWithColor(float r, float g, float b, float a) = 0;
 
+#ifdef USE_HWC2
     virtual void setupColorTransform(const mat4& /* colorTransform */) = 0;
+#else
+    virtual mat4 setupColorTransform(const mat4& /* colorTransform */) = 0;
+#endif
     virtual void setSaturationMatrix(const mat4& /* saturationMatrix */) = 0;
 
     virtual void disableTexturing() = 0;
@@ -228,7 +232,12 @@ public:
 
     void checkErrors() const override;
 
+#ifdef USE_HWC2
     void setupColorTransform(const mat4& /* colorTransform */) override {}
+#else
+    mat4 setupColorTransform(const mat4& /* colorTransform */) override { return mat4();}
+#endif
+
     void setSaturationMatrix(const mat4& /* saturationMatrix */) override {}
 
     // internal to RenderEngine
