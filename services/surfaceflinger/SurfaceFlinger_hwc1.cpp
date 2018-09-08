@@ -1852,10 +1852,11 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                                                                            : HWC_POWER_MODE_OFF;
                     const wp<IBinder>& display(curr.keyAt(i));
                     if (dispSurface != NULL) {
+
                         sp<DisplayDevice> hw = new DisplayDevice(this,
                                 state.type, hwcDisplayId,
                                 getBE().mHwc->getFormat(hwcDisplayId), state.isSecure,
-                                display, dispSurface, std::move(renderSurface), displayWidth, displayHeight, initialPowerMode);
+                                display, nativeWindow, dispSurface, std::move(renderSurface), displayWidth, displayHeight, initialPowerMode);
                         hw->setLayerStack(state.layerStack);
                         hw->setProjection(state.orientation,
                                 state.viewport, state.frame);
