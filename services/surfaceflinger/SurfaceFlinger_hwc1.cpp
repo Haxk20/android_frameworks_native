@@ -396,7 +396,7 @@ void SurfaceFlinger::deleteTextureAsync(uint32_t texture) {
     postMessageAsync(new MessageDestroyGLTexture(getRenderEngine(), texture));
 }
 
-class DispSyncSource final : public VSyncSource, private DispSync::Callback {
+class DispSyncSource : public VSyncSource, private DispSync::Callback {
 public:
     DispSyncSource(DispSync* dispSync, nsecs_t phaseOffset, bool traceVsync,
         const char* name) :
@@ -407,13 +407,14 @@ public:
             mVsyncEventLabel(String8::format("VSYNC-%s", name)),
             mDispSync(dispSync),
             mCallbackMutex(),
+            mCallback(),
             mVsyncMutex(),
             mPhaseOffset(phaseOffset),
             mEnabled(false) {}
 
-    ~DispSyncSource() override = default;
+    virtual ~DispSyncSource() {}
 
-    void setVSyncEnabled(bool enable) override {
+    virtual void setVSyncEnabled(bool enable) {
         Mutex::Autolock lock(mVsyncMutex);
         if (enable) {
             status_t err = mDispSync->addEventListener(mName, mPhaseOffset,
@@ -435,12 +436,12 @@ public:
         mEnabled = enable;
     }
 
-    void setCallback(VSyncSource::Callback *callback) override{
+    virtual void setCallback(const sp<VSyncSource::Callback>& callback) {
         Mutex::Autolock lock(mCallbackMutex);
         mCallback = callback;
     }
 
-    void setPhaseOffset(nsecs_t phaseOffset) override {
+    virtual void setPhaseOffset(nsecs_t phaseOffset) {
         Mutex::Autolock lock(mVsyncMutex);
 
         // Normalize phaseOffset to [0, period)
@@ -477,7 +478,7 @@ public:
 
 private:
     virtual void onDispSyncEvent(nsecs_t when) {
-        VSyncSource::Callback* callback = nullptr;
+        sp<VSyncSource::Callback> callback;
         {
             Mutex::Autolock lock(mCallbackMutex);
             callback = mCallback;
@@ -504,7 +505,7 @@ private:
     DispSync* mDispSync;
 
     Mutex mCallbackMutex; // Protects the following
-    VSyncSource::Callback *mCallback = nullptr;
+    sp<VSyncSource::Callback> mCallback;
 
     Mutex mVsyncMutex; // Protects the following
     nsecs_t mPhaseOffset;
@@ -517,7 +518,7 @@ public:
 
     virtual ~InjectVSyncSource() {}
 
-    virtual void setCallback(VSyncSource::Callback* callback) {
+    virtual void setCallback(const sp<VSyncSource::Callback>& callback) {
         std::lock_guard<std::mutex> lock(mCallbackMutex);
         mCallback = callback;
     }
@@ -532,7 +533,7 @@ public:
 
 private:
     std::mutex mCallbackMutex; // Protects the following
-    VSyncSource::Callback *mCallback;
+    sp<VSyncSource::Callback> mCallback;
 };
 
 // Do not call property_set on main thread which will be blocked by init
@@ -544,15 +545,23 @@ void SurfaceFlinger::init() {
     Mutex::Autolock _l(mStateLock);
 
     // start the EventThread
-    mEventThreadSource = std::make_unique<DispSyncSource>(
-            &mPrimaryDispSync, vsyncPhaseOffsetNs, true, "app");
-    mEventThread = std::make_unique<impl::EventThread>(
-            mEventThreadSource.get(), *this, false, "sfEventThread");
-    mSfEventThreadSource = std::make_unique<DispSyncSource>(
-            &mPrimaryDispSync, sfVsyncPhaseOffsetNs, true, "sf");
-    mSFEventThread = std::make_unique<impl::EventThread>(
-            mSfEventThreadSource.get(), *this, true, "appEventThread");
-    mEventQueue->setEventThread(mSFEventThread.get());
+    sp<VSyncSource> vsyncSrc = new DispSyncSource(&mPrimaryDispSync,
+            vsyncPhaseOffsetNs, true, "app");
+    mEventThread = new EventThread(vsyncSrc, *this, false);
+    sp<VSyncSource> sfVsyncSrc = new DispSyncSource(&mPrimaryDispSync,
+            sfVsyncPhaseOffsetNs, true, "sf");
+    mSFEventThread = new EventThread(sfVsyncSrc, *this, true);
+    mEventQueue->setEventThread(mSFEventThread);
+
+    // set EventThread and SFEventThread to SCHED_FIFO to minimize jitter
+    struct sched_param param = {0};
+    param.sched_priority = 2;
+    if (sched_setscheduler(mSFEventThread->getTid(), SCHED_FIFO, &param) != 0) {
+        ALOGE("Couldn't set SCHED_FIFO for SFEventThread");
+    }
+    if (sched_setscheduler(mEventThread->getTid(), SCHED_FIFO, &param) != 0) {
+        ALOGE("Couldn't set SCHED_FIFO for EventThread");
+    }
 
     // Initialize the H/W composer object.  There may or may not be an
     // actual hardware composer underneath.
@@ -938,16 +947,14 @@ status_t SurfaceFlinger::enableVSyncInjections(bool enable) {
         mInjectVSyncs = enable;
         ALOGV("VSync Injections enabled");
         if (mVSyncInjector.get() == nullptr) {
-                mVSyncInjector = std::make_unique<InjectVSyncSource>();
-                mInjectorEventThread =
-                        std::make_unique<impl::EventThread>(mVSyncInjector.get(), *this, false,
-                                                            "injEventThread");
+            mVSyncInjector = new InjectVSyncSource();
+            mInjectorEventThread = new EventThread(mVSyncInjector, *this, false);
         }
-        mEventQueue->setEventThread(mInjectorEventThread.get());
+        mEventQueue->setEventThread(mInjectorEventThread);
     } else {
         mInjectVSyncs = enable;
         ALOGV("VSync Injections disabled");
-        mEventQueue->setEventThread(mSFEventThread.get());
+        mEventQueue->setEventThread(mSFEventThread);
         mVSyncInjector.clear();
     }
     return NO_ERROR;
