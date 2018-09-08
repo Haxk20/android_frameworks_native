@@ -85,7 +85,11 @@ void MessageQueue::init(const sp<SurfaceFlinger>& flinger) {
     mHandler = new Handler(*this);
 }
 
+#ifdef USE_HWC2
 void MessageQueue::setEventThread(android::EventThread* eventThread) {
+#else
+void MessageQueue::setEventThread(const sp<android::EventThread>& eventThread) {
+#endif
     if (mEventThread == eventThread) {
         return;
     }

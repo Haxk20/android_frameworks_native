@@ -367,7 +367,11 @@ public:
 private:
     friend class Client;
     friend class DisplayEventConnection;
+#ifdef USE_HWC2
     friend class impl::EventThread;
+#else
+    friend class EventThread;
+#endif
     friend class Layer;
     friend class BufferLayer;
     friend class MonitoredProducer;
@@ -843,6 +847,7 @@ private:
     // constant members (no synchronization needed for access)
     nsecs_t mBootTime;
     bool mGpuToCpuSupported;
+#ifdef USE_HWC2
     std::unique_ptr<EventThread> mEventThread;
     std::unique_ptr<EventThread> mSFEventThread;
     std::unique_ptr<EventThread> mInjectorEventThread;
@@ -850,6 +855,14 @@ private:
     std::unique_ptr<VSyncSource> mSfEventThreadSource;
     std::unique_ptr<InjectVSyncSource> mVSyncInjector;
     std::unique_ptr<EventControlThread> mEventControlThread;
+#else
+    sp<EventThread> mEventThread;
+    sp<EventThread> mSFEventThread;
+    sp<EventThread> mInjectorEventThread;
+    sp<InjectVSyncSource> mVSyncInjector;
+    sp<EventControlThread> mEventControlThread;
+#endif
+
     sp<IBinder> mBuiltinDisplays[DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES];
     VSyncModulator mVsyncModulator;
 

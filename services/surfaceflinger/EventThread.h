@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef USE_HWC2
+#include "EventThread_hwc1.h"
+#else
 #pragma once
 
 #include <stdint.h>
@@ -169,3 +172,4 @@ private:
 
 } // namespace impl
 } // namespace android
+#endif

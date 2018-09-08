@@ -85,7 +85,11 @@ public:
     virtual ~MessageQueue();
 
     virtual void init(const sp<SurfaceFlinger>& flinger) = 0;
+#ifdef USE_HWC2
     virtual void setEventThread(EventThread* events) = 0;
+#else
+    virtual void setEventThread(const sp<android::EventThread>& events) = 0;
+#endif
     virtual void waitMessage() = 0;
     virtual status_t postMessage(const sp<MessageBase>& message, nsecs_t reltime = 0) = 0;
     virtual void invalidate() = 0;
@@ -113,7 +117,11 @@ class MessageQueue final : public android::MessageQueue {
 
     sp<SurfaceFlinger> mFlinger;
     sp<Looper> mLooper;
+#ifdef USE_HWC2
     android::EventThread* mEventThread;
+#else
+    sp<android::EventThread> mEventThread;
+#endif
     sp<IDisplayEventConnection> mEvents;
     gui::BitTube mEventTube;
     sp<Handler> mHandler;
@@ -124,8 +132,11 @@ class MessageQueue final : public android::MessageQueue {
 public:
     ~MessageQueue() override = default;
     void init(const sp<SurfaceFlinger>& flinger) override;
+#ifdef USE_HWC2
     void setEventThread(android::EventThread* events) override;
-
+#else
+    void setEventThread(const sp<android::EventThread>& events) override;
+#endif
     void waitMessage() override;
     status_t postMessage(const sp<MessageBase>& message, nsecs_t reltime = 0) override;
 
