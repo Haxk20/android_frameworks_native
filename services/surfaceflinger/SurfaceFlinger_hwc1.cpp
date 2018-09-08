@@ -29,6 +29,8 @@
 #include <cutils/properties.h>
 #include <log/log.h>
 
+#include <android/sync.h>
+
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
@@ -72,6 +74,7 @@
 #include "BufferLayer.h"
 #include "LayerVector.h"
 #include "ColorLayer.h"
+#include "ContainerLayer.h"
 #include "MonitoredProducer.h"
 #include "SurfaceFlinger.h"
 
@@ -1524,7 +1527,7 @@ void SurfaceFlinger::setUpHWComposer() {
                      * and build the transparent region of the FB
                      */
                     const sp<Layer>& layer(currentLayers[i]);
-                    layer->setPerFrameData(hw, *cur);
+                    layer->setAcquireFence(hw, *cur);
                 }
             }
         }
@@ -3841,38 +3844,40 @@ public:
     }
 };
 
-status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display,
-    const sp<IGraphicBufferProducer>& producer,
-    Rect sourceCrop, uint32_t reqWidth, uint32_t reqHeight,
-    int32_t minLayerZ, int32_t maxLayerZ,
-    bool useIdentityTransform, ISurfaceComposer::Rotation rotation) {
+status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display, sp<GraphicBuffer>* outBuffer,
+                                       Rect sourceCrop, uint32_t reqWidth, uint32_t reqHeight,
+                                       int32_t minLayerZ, int32_t maxLayerZ,
+                                       bool useIdentityTransform,
+                                       ISurfaceComposer::Rotation rotation) {
     ATRACE_CALL();
-    if (CC_UNLIKELY(display == 0))
-        return BAD_VALUE;
+
+    if (CC_UNLIKELY(display == 0)) return BAD_VALUE;
 
     const sp<const DisplayDevice> device(getDisplayDeviceLocked(display));
+    if (CC_UNLIKELY(device == 0)) return BAD_VALUE;
+
     DisplayRenderArea renderArea(device, sourceCrop, reqHeight, reqWidth, rotation);
 
     auto traverseLayers = std::bind(std::mem_fn(&SurfaceFlinger::traverseLayersInDisplay), this,
                                     device, minLayerZ, maxLayerZ, std::placeholders::_1);
-    return captureScreenCommon(renderArea, traverseLayers, producer, useIdentityTransform);
+    return captureScreenCommon(renderArea, traverseLayers, outBuffer, useIdentityTransform);
 }
 
 status_t SurfaceFlinger::captureLayers(const sp<IBinder>& layerHandleBinder,
-                                       const sp<IGraphicBufferProducer>& producer,
-                                       ISurfaceComposer::Rotation rotation) {
+                                       sp<GraphicBuffer>* outBuffer, const Rect& sourceCrop,
+                                       float frameScale, bool childrenOnly) {
     ATRACE_CALL();
+
     class LayerRenderArea : public RenderArea {
     public:
-        LayerRenderArea(const sp<Layer>& layer, ISurfaceComposer::Rotation rotation)
-              : RenderArea(layer->getCurrentState().active.h, layer->getCurrentState().active.w,
-                           rotation),
-                mLayer(layer) {}
-        const Transform& getTransform() const override {
-            // Make the top level transform the inverse the transform and it's parent so it sets
-            // the whole capture back to 0,0
-            return *new Transform(mLayer->getTransform().inverse());
-        }
+        LayerRenderArea(SurfaceFlinger* flinger, const sp<Layer>& layer, const Rect crop,
+                        int32_t reqWidth, int32_t reqHeight, bool childrenOnly)
+              : RenderArea(reqHeight, reqWidth, CaptureFill::CLEAR),
+                mLayer(layer),
+                mCrop(crop),
+                mFlinger(flinger),
+                mChildrenOnly(childrenOnly) {}
+        const Transform& getTransform() const override { return mTransform; }
         Rect getBounds() const override {
             const Layer::State& layerState(mLayer->getDrawingState());
             return Rect(layerState.active.w, layerState.active.h);
@@ -3881,88 +3886,170 @@ status_t SurfaceFlinger::captureLayers(const sp<IBinder>& layerHandleBinder,
         int getWidth() const override { return mLayer->getDrawingState().active.w; }
         bool isSecure() const override { return false; }
         bool needsFiltering() const override { return false; }
+        Rect getSourceCrop() const override {
+            if (mCrop.isEmpty()) {
+                return getBounds();
+            } else {
+                return mCrop;
+            }
+        }
+        class ReparentForDrawing {
+        public:
+            const sp<Layer>& oldParent;
+            const sp<Layer>& newParent;
 
-        Rect getSourceCrop() const override { return getBounds(); }
+            ReparentForDrawing(const sp<Layer>& oldParent, const sp<Layer>& newParent)
+                  : oldParent(oldParent), newParent(newParent) {
+                oldParent->setChildrenDrawingParent(newParent);
+            }
+            ~ReparentForDrawing() { oldParent->setChildrenDrawingParent(oldParent); }
+        };
+
+        void render(std::function<void()> drawLayers) override {
+            if (!mChildrenOnly) {
+                mTransform = mLayer->getTransform().inverse();
+                drawLayers();
+            } else {
+                Rect bounds = getBounds();
+                screenshotParentLayer =
+                        new ContainerLayer(mFlinger, nullptr, String8("Screenshot Parent"),
+                                           bounds.getWidth(), bounds.getHeight(), 0);
+
+                ReparentForDrawing reparent(mLayer, screenshotParentLayer);
+                drawLayers();
+            }
+        }
 
     private:
-        const sp<Layer>& mLayer;
+        const sp<Layer> mLayer;
+        const Rect mCrop;
+
+        // In the "childrenOnly" case we reparent the children to a screenshot
+        // layer which has no properties set and which does not draw.
+        sp<ContainerLayer> screenshotParentLayer;
+        Transform mTransform;
+
+        SurfaceFlinger* mFlinger;
+        const bool mChildrenOnly;
     };
 
     auto layerHandle = reinterpret_cast<Layer::Handle*>(layerHandleBinder.get());
     auto parent = layerHandle->owner.promote();
 
-    LayerRenderArea renderArea(parent, rotation);
-    auto traverseLayers = [parent](const LayerVector::Visitor& visitor) {
+    if (parent == nullptr || parent->isPendingRemoval()) {
+        ALOGE("captureLayers called with a removed parent");
+        return NAME_NOT_FOUND;
+    }
+
+    const int uid = IPCThreadState::self()->getCallingUid();
+    const bool forSystem = uid == AID_GRAPHICS || uid == AID_SYSTEM;
+    if (!forSystem && parent->getCurrentState().flags & layer_state_t::eLayerSecure) {
+        ALOGW("Attempting to capture secure layer: PERMISSION_DENIED");
+        return PERMISSION_DENIED;
+    }
+
+    Rect crop(sourceCrop);
+    if (sourceCrop.width() <= 0) {
+        crop.left = 0;
+        crop.right = parent->getCurrentState().active.w;
+    }
+
+    if (sourceCrop.height() <= 0) {
+        crop.top = 0;
+        crop.bottom = parent->getCurrentState().active.h;
+    }
+
+    int32_t reqWidth = crop.width() * frameScale;
+    int32_t reqHeight = crop.height() * frameScale;
+
+    LayerRenderArea renderArea(this, parent, crop, reqWidth, reqHeight, childrenOnly);
+
+    auto traverseLayers = [parent, childrenOnly](const LayerVector::Visitor& visitor) {
         parent->traverseChildrenInZOrder(LayerVector::StateSet::Drawing, [&](Layer* layer) {
             if (!layer->isVisible()) {
+                return;
+            } else if (childrenOnly && layer == parent.get()) {
                 return;
             }
             visitor(layer);
         });
     };
-    return captureScreenCommon(renderArea, traverseLayers, producer, false);
+    return captureScreenCommon(renderArea, traverseLayers, outBuffer, false);
 }
 
 status_t SurfaceFlinger::captureScreenCommon(RenderArea& renderArea,
                                              TraverseLayersFunction traverseLayers,
-                                             const sp<IGraphicBufferProducer>& producer,
+                                             sp<GraphicBuffer>* outBuffer,
                                              bool useIdentityTransform) {
-    if (CC_UNLIKELY(producer == 0))
-        return BAD_VALUE;
+    ATRACE_CALL();
 
-    // if we have secure windows on this display, never allow the screen capture
-    // unless the producer interface is local (i.e.: we can take a screenshot for
-    // ourselves).
-    bool isLocalScreenshot = IInterface::asBinder(producer)->localBinder();
+    renderArea.updateDimensions(mPrimaryDisplayOrientation);
 
-    class MessageCaptureScreen : public MessageBase {
-        SurfaceFlinger* flinger;
-        const RenderArea* renderArea;
-        TraverseLayersFunction traverseLayers;
-        sp<IGraphicBufferProducer> producer;
-        bool useIdentityTransform;
-        status_t result;
-        bool isLocalScreenshot;
-    public:
-        MessageCaptureScreen(SurfaceFlinger* flinger, const RenderArea* renderArea,
-                             TraverseLayersFunction traverseLayers,
-                             const sp<IGraphicBufferProducer>& producer, bool useIdentityTransform,
-                             bool isLocalScreenshot)
-              : flinger(flinger),
-                renderArea(renderArea),
-                traverseLayers(traverseLayers),
-                producer(producer),
-                useIdentityTransform(useIdentityTransform),
-                result(PERMISSION_DENIED),
-                isLocalScreenshot(isLocalScreenshot) {}
-        status_t getResult() const {
-            return result;
+    const uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
+            GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
+    *outBuffer = new GraphicBuffer(renderArea.getReqWidth(), renderArea.getReqHeight(),
+                                   HAL_PIXEL_FORMAT_RGBA_8888, 1, usage, "screenshot");
+
+    // This mutex protects syncFd and captureResult for communication of the return values from the
+    // main thread back to this Binder thread
+    std::mutex captureMutex;
+    std::condition_variable captureCondition;
+    std::unique_lock<std::mutex> captureLock(captureMutex);
+    int syncFd = -1;
+    std::optional<status_t> captureResult;
+
+    const int uid = IPCThreadState::self()->getCallingUid();
+    const bool forSystem = uid == AID_GRAPHICS || uid == AID_SYSTEM;
+
+    sp<LambdaMessage> message = new LambdaMessage([&]() {
+        // If there is a refresh pending, bug out early and tell the binder thread to try again
+        // after the refresh.
+        if (mRefreshPending) {
+            ATRACE_NAME("Skipping screenshot for now");
+            std::unique_lock<std::mutex> captureLock(captureMutex);
+            captureResult = std::make_optional<status_t>(EAGAIN);
+            captureCondition.notify_one();
+            return;
         }
-        virtual bool handler() {
-            Mutex::Autolock _l(flinger->mStateLock);
-            result = flinger->captureScreenImplLocked(*renderArea, traverseLayers, producer,
-                                                      useIdentityTransform, isLocalScreenshot);
-            static_cast<GraphicProducerWrapper*>(IInterface::asBinder(producer).get())->exit(result);
-            return true;
+
+        status_t result = NO_ERROR;
+        int fd = -1;
+        {
+            Mutex::Autolock _l(mStateLock);
+            renderArea.render([&]() {
+                result = captureScreenImplLocked(renderArea, traverseLayers, (*outBuffer).get(),
+                                                 useIdentityTransform, forSystem, &fd);
+            });
         }
-    };
 
-    // this creates a "fake" BBinder which will serve as a "fake" remote
-    // binder to receive the marshaled calls and forward them to the
-    // real remote (a BpGraphicBufferProducer)
-    sp<GraphicProducerWrapper> wrapper = new GraphicProducerWrapper(producer);
+        {
+            std::unique_lock<std::mutex> captureLock(captureMutex);
+            syncFd = fd;
+            captureResult = std::make_optional<status_t>(result);
+            captureCondition.notify_one();
+        }
+    });
 
-    // the asInterface() call below creates our "fake" BpGraphicBufferProducer
-    // which does the marshaling work forwards to our "fake remote" above.
-    sp<MessageBase> msg = new MessageCaptureScreen(this,
-            &renderArea, traverseLayers, IGraphicBufferProducer::asInterface( wrapper ),
-            useIdentityTransform, isLocalScreenshot);
-
-    status_t res = postMessageAsync(msg);
-    if (res == NO_ERROR) {
-        res = wrapper->waitForResponse();
+    status_t result = postMessageAsync(message);
+    if (result == NO_ERROR) {
+        captureCondition.wait(captureLock, [&]() { return captureResult; });
+        while (*captureResult == EAGAIN) {
+            captureResult.reset();
+            result = postMessageAsync(message);
+            if (result != NO_ERROR) {
+                return result;
+            }
+            captureCondition.wait(captureLock, [&]() { return captureResult; });
+        }
+        result = *captureResult;
     }
-    return res;
+
+    if (result == NO_ERROR) {
+        sync_wait(syncFd, -1);
+        close(syncFd);
+    }
+
+    return result;
 }
 
 void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea, TraverseLayersFunction traverseLayers,
@@ -4027,91 +4114,60 @@ void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea, Traver
 
 status_t SurfaceFlinger::captureScreenImplLocked(const RenderArea& renderArea,
                                                  TraverseLayersFunction traverseLayers,
-                                                 const sp<IGraphicBufferProducer>& producer,
+                                                 ANativeWindowBuffer* buffer,
                                                  bool useIdentityTransform,
-                                                 bool isLocalScreenshot) {
+                                                 bool forSystem,
+                                                 int* outSyncFd) {
     ATRACE_CALL();
 
     bool secureLayerIsVisible = false;
-    traverseLayers([&](Layer *layer) {
-        secureLayerIsVisible = secureLayerIsVisible || (layer->isVisible() &&
-            layer->isSecure());
+
+    traverseLayers([&](Layer* layer) {
+        secureLayerIsVisible = secureLayerIsVisible || (layer->isVisible() && layer->isSecure());
     });
 
-    if (!isLocalScreenshot && secureLayerIsVisible) {
+    // We allow the system server to take screenshots of secure layers for
+    // use in situations like the Screen-rotation animation and place
+    // the impetus on WindowManager to not persist them.
+    if (secureLayerIsVisible && !forSystem) {
         ALOGW("FB is protected: PERMISSION_DENIED");
         return PERMISSION_DENIED;
     }
 
-    // create a surface (because we're a producer, and we need to
-    // dequeue/queue a buffer)
-    sp<Surface> sur = new Surface(producer, false);
-    ANativeWindow* window = sur.get();
-
-    status_t result = native_window_api_connect(window, NATIVE_WINDOW_API_EGL);
-    if (result == NO_ERROR) {
-        uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
-                        GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
-
-        int err = 0;
-        err = native_window_set_buffers_dimensions(window, renderArea.getReqWidth(),
-                                                   renderArea.getReqHeight());
-        err |= native_window_set_scaling_mode(window, NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-        err |= native_window_set_buffers_format(window, HAL_PIXEL_FORMAT_RGBA_8888);
-        err |= native_window_set_usage(window, usage);
-
-        if (err == NO_ERROR) {
-            ANativeWindowBuffer* buffer;
-            /* TODO: Once we have the sync framework everywhere this can use
-             * server-side waits on the fence that dequeueBuffer returns.
-             */
-            result = native_window_dequeue_buffer_and_wait(window,  &buffer);
-            if (result == NO_ERROR) {
-                int syncFd = -1;
-
-                // this binds the given EGLImage as a framebuffer for the
-                // duration of this scope.
-                RE::RenderEngine::BindNativeBufferAsFramebuffer bufferBond(getRenderEngine(), buffer);
-                if (bufferBond.getStatus() != NO_ERROR) {
-                     ALOGE("got ANWB binding error while taking screenshot");
-                     // this will in fact render into our dequeued buffer
-                     // via an FBO, which means we didn't have to create
-                     // an EGLSurface and therefore we're not
-                     // dependent on the context's EGLConfig.
-                     renderScreenImplLocked(renderArea, traverseLayers, true, useIdentityTransform);
-
-                     syncFd = getRenderEngine().flush(DEBUG_SCREENSHOTS);
-
-                     if (DEBUG_SCREENSHOTS) {
-                         uint32_t* pixels = new uint32_t[renderArea.getReqWidth() *
-                                                         renderArea.getReqHeight()];
-                         getRenderEngine().readPixels(0, 0, renderArea.getReqWidth(),
-                                                      renderArea.getReqHeight(), pixels);
-                         checkScreenshot(renderArea.getReqWidth(), renderArea.getReqHeight(),
-                                         renderArea.getReqWidth(), pixels, traverseLayers);
-                         delete [] pixels;
-                     }
-
-                 } else {
-                     ALOGE("got GL_FRAMEBUFFER_COMPLETE_OES error while taking screenshot");
-                     result = INVALID_OPERATION;
-                     window->cancelBuffer(window, buffer, syncFd);
-                     buffer = NULL;
-                 }
-             } else {
-                 result = BAD_VALUE;
-             }
-             if (buffer) {
-                 // queueBuffer takes ownership of syncFd
-                 result = window->queueBuffer(window, buffer, syncFd);
-             }
-        } else {
-            result = BAD_VALUE;
-        }
-        native_window_api_disconnect(window, NATIVE_WINDOW_API_EGL);
+    // this binds the given EGLImage as a framebuffer for the
+    // duration of this scope.
+    RE::BindNativeBufferAsFramebuffer bufferBond(getRenderEngine(), buffer);
+    if (bufferBond.getStatus() != NO_ERROR) {
+        ALOGE("got ANWB binding error while taking screenshot");
+        return INVALID_OPERATION;
     }
 
-    return result;
+    // this will in fact render into our dequeued buffer
+    // via an FBO, which means we didn't have to create
+    // an EGLSurface and therefore we're not
+    // dependent on the context's EGLConfig.
+    renderScreenImplLocked(renderArea, traverseLayers, true, useIdentityTransform);
+
+    if (DEBUG_SCREENSHOTS) {
+        getRenderEngine().finish();
+        *outSyncFd = -1;
+
+        const auto reqWidth = renderArea.getReqWidth();
+        const auto reqHeight = renderArea.getReqHeight();
+
+        uint32_t* pixels = new uint32_t[reqWidth*reqHeight];
+        getRenderEngine().readPixels(0, 0, reqWidth, reqHeight, pixels);
+        checkScreenshot(reqWidth, reqHeight, reqWidth, pixels, traverseLayers);
+        delete [] pixels;
+    } else {
+        base::unique_fd syncFd = getRenderEngine().flush();
+        if (syncFd < 0) {
+            getRenderEngine().finish();
+        }
+        *outSyncFd = syncFd.release();
+    }
+
+    return NO_ERROR;
 }
 
 void SurfaceFlinger::checkScreenshot(size_t w, size_t s, size_t h, void const* vaddr,
