@@ -396,19 +396,22 @@ private:
             // always uses the Drawing StateSet.
             layersSortedByZ = other.layersSortedByZ;
             displays = other.displays;
+#ifdef USE_HWC2
             colorMatrixChanged = other.colorMatrixChanged;
             if (colorMatrixChanged) {
                 colorMatrix = other.colorMatrix;
             }
+#endif
             return *this;
         }
 
         const LayerVector::StateSet stateSet = LayerVector::StateSet::Invalid;
         LayerVector layersSortedByZ;
         DefaultKeyedVector< wp<IBinder>, DisplayDeviceState> displays;
-
+#ifdef USE_HWC2
         bool colorMatrixChanged = true;
         mat4 colorMatrix;
+#endif
 
         void traverseInZOrder(const LayerVector::Visitor& visitor) const;
         void traverseInReverseZOrder(const LayerVector::Visitor& visitor) const;
@@ -802,9 +805,9 @@ private:
 
     // Check to see if we should handoff to vr flinger.
     void updateVrFlinger();
-#endif
 
     void updateColorMatrixLocked();
+#endif
 
     /* ------------------------------------------------------------------------
      * Attributes
@@ -819,10 +822,12 @@ private:
     bool mAnimTransactionPending;
     SortedVector< sp<Layer> > mLayersPendingRemoval;
 
+#ifdef USE_HWC2
     // global color transform states
     Daltonizer mDaltonizer;
     float mGlobalSaturationFactor = 1.0f;
     mat4 mClientColorMatrix;
+#endif
 
     // Can't be unordered_set because wp<> isn't hashable
     std::set<wp<IBinder>> mGraphicBufferProducerList;
@@ -917,6 +922,14 @@ private:
 
 #ifndef USE_HWC2
     bool mDaltonize;
+    Daltonizer mDaltonizer;
+
+    mat4 mPreviousColorMatrix;
+    mat4 mColorMatrix;
+    bool mHasColorMatrix;
+
+    nsecs_t mTotalTime;
+    std::atomic<nsecs_t> mLastSwapTime;
 #endif
     // Static screen stats
     bool mHasPoweredOff;

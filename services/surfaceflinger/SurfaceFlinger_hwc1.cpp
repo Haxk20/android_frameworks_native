@@ -4033,7 +4033,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(const RenderArea& renderArea,
 
                 // this binds the given EGLImage as a framebuffer for the
                 // duration of this scope.
-                RenderEngine::BindNativeBufferAsFramebuffer bufferBond(getRenderEngine(), buffer);
+                RE::RenderEngine::BindNativeBufferAsFramebuffer bufferBond(getRenderEngine(), buffer);
                 if (bufferBond.getStatus() != NO_ERROR) {
                      ALOGE("got ANWB binding error while taking screenshot");
                      // this will in fact render into our dequeued buffer
