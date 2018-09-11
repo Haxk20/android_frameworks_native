@@ -93,6 +93,10 @@ public:
             uint32_t inLayerCount, uint64_t inUsage,
             std::string requestorName = "<Unknown>");
 
+    GraphicBuffer(uint32_t inWidth, uint32_t inHeight, PixelFormat inFormat,
+            uint32_t inUsage, uint32_t inStride, native_handle_t* inHandle,
+            bool keepOwnership);
+
     // Create a GraphicBuffer from an existing handle.
     enum HandleWrapMethod : uint8_t {
         // Wrap and use the handle directly.  It assumes the handle has been
@@ -143,6 +147,12 @@ public:
             native_handle_t* inHandle, bool keepOwnership);
     GraphicBuffer(uint32_t inWidth, uint32_t inHeight, PixelFormat inFormat,
             uint32_t inUsage, std::string requestorName = "<Unknown>");
+    GraphicBuffer(uint32_t inWidth, uint32_t inHeight, PixelFormat inFormat,
+            uint64_t inUsage, std::string requestorName = "<Unknown>");
+
+    // create a buffer from an existing ANativeWindowBuffer
+    GraphicBuffer(ANativeWindowBuffer* buffer, bool keepOwnership);
+
 
     // return status
     status_t initCheck() const;
@@ -150,7 +160,7 @@ public:
     uint32_t getWidth() const           { return static_cast<uint32_t>(width); }
     uint32_t getHeight() const          { return static_cast<uint32_t>(height); }
     uint32_t getStride() const          { return static_cast<uint32_t>(stride); }
-    uint64_t getUsage() const           { return static_cast<uint64_t>(usage); }
+    uint64_t getUsage() const           { return usage; }
     PixelFormat getPixelFormat() const  { return format; }
     uint32_t getLayerCount() const      { return static_cast<uint32_t>(layerCount); }
     Rect getBounds() const              { return Rect(width, height); }
