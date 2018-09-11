@@ -618,14 +618,12 @@ void getNativePixelFormat(EGLDisplay dpy, egl_connection_t* cnx, EGLConfig confi
     cnx->egl.eglGetConfigAttrib(dpy, config, EGL_COLOR_COMPONENT_TYPE_EXT, &componentType);
 
 #if WORKAROUND_BUG_10194508
-    int intFormat = (int)(format);
     if (!cnx->egl.eglGetConfigAttrib(dpy, config, EGL_NATIVE_VISUAL_ID,
-            &intFormat)) {
+            &format)) {
         ALOGE("eglGetConfigAttrib(EGL_NATIVE_VISUAL_ID) failed: %#x",
                 eglGetError());
         format = 0;
     }
-    format = (android_pixel_format)intFormat;
 #else
     EGLint a = 0;
     EGLint r, g, b;
@@ -688,16 +686,6 @@ EGLSurface eglCreateWindowSurface(  EGLDisplay dpy, EGLConfig config,
     if (dp) {
         EGLDisplay iDpy = dp->disp.dpy;
 
-        if (!window) {
-            return setError(EGL_BAD_NATIVE_WINDOW, EGL_NO_SURFACE);
-        }
-
-        int value = 0;
-        window->query(window, NATIVE_WINDOW_IS_VALID, &value);
-        if (!value) {
-            return setError(EGL_BAD_NATIVE_WINDOW, EGL_NO_SURFACE);
-        }
-
         int result = native_window_api_connect(window, NATIVE_WINDOW_API_EGL);
         if (result < 0) {
             ALOGE("eglCreateWindowSurface: native_window_api_connect (win=%p) "
@@ -750,7 +738,7 @@ EGLSurface eglCreateWindowSurface(  EGLDisplay dpy, EGLConfig config,
         anw->setSwapInterval(anw, 1);
 
         EGLSurface surface = cnx->egl.eglCreateWindowSurface(
-                iDpy, config, window, attrib_list);
+                iDpy, config, window, NULL);
         if (surface != EGL_NO_SURFACE) {
             egl_surface_t* s =
                     new egl_surface_t(dp.get(), config, window, surface, colorSpace, cnx);
