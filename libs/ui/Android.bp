@@ -23,7 +23,6 @@ cc_library_shared {
     clang: true,
     cflags: [
         "-Wall",
-        "-Werror",
     ],
     cppflags: [
         "-Weverything",
@@ -59,7 +58,6 @@ cc_library_shared {
         "FenceTime.cpp",
         "FrameStats.cpp",
         "FramebufferNativeWindow.cpp",
-        "Gralloc2.cpp",
         "GraphicBuffer.cpp",
         "GraphicBufferAllocator.cpp",
         "GraphicBufferMapper.cpp",
