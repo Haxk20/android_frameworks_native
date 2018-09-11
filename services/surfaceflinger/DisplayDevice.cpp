@@ -176,12 +176,15 @@ DisplayDevice::DisplayDevice(
     mPowerMode = (mType >= DisplayDevice::DISPLAY_VIRTUAL) ?
                   HWC_POWER_MODE_NORMAL : HWC_POWER_MODE_OFF;
 
+
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
 
+#ifndef STE_HARDWARE
     if (useTripleFramebuffer) {
         surface->allocateBuffers();
     }
+#endif
 }
 
 DisplayDevice::~DisplayDevice() {
