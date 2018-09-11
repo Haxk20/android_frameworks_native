@@ -193,7 +193,7 @@ bool GraphicBuffer::needsReallocation(uint32_t inWidth, uint32_t inHeight,
 }
 
 status_t GraphicBuffer::initWithSize(uint32_t inWidth, uint32_t inHeight,
-        PixelFormat inFormat, uint32_t inLayerCount, uint64_t inUsage,
+        PixelFormat inFormat, uint32_t inLayerCount, uint32_t inUsage,
         std::string requestorName)
 {
     GraphicBufferAllocator& allocator = GraphicBufferAllocator::get();

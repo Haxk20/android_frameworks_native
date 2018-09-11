@@ -47,7 +47,7 @@ public:
     static inline GraphicBufferAllocator& get() { return getInstance(); }
 
     status_t allocate(uint32_t w, uint32_t h, PixelFormat format,
-            uint32_t layerCount, uint64_t usage,
+            uint32_t layerCount, uint32_t usage,
             buffer_handle_t* handle, uint32_t* stride, uint64_t graphicBufferId,
             std::string requestorName);
 

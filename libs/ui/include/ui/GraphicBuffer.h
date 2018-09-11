@@ -227,7 +227,7 @@ private:
 
     status_t initWithSize(uint32_t inWidth, uint32_t inHeight,
             PixelFormat inFormat, uint32_t inLayerCount,
-            uint64_t inUsage, std::string requestorName);
+            uint32_t inUsage, std::string requestorName);
 
     status_t initWithHandle(const native_handle_t* handle,
             HandleWrapMethod method, uint32_t width, uint32_t height,
