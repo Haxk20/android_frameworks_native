@@ -26,7 +26,7 @@
 #include <math/mat4.h>
 #include <Transform.h>
 
-#define EGL_NO_CONFIG ((EGLConfig)-1)
+#define EGL_NO_CONFIG ((EGLConfig)0)
 
 // ---------------------------------------------------------------------------
 namespace android {

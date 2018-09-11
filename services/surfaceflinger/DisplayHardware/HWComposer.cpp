@@ -59,7 +59,7 @@ namespace android {
 
 // ---------------------------------------------------------------------------
 
-HWComposer::HWComposer(bool useVrComposer)
+HWComposer::HWComposer(const std::string& serviceName)
     : mHwcDevice(),
       mDisplayData(2),
       mFreeDisplaySlots(),
@@ -73,7 +73,7 @@ HWComposer::HWComposer(bool useVrComposer)
         mVSyncCounts[i] = 0;
     }
 
-    mHwcDevice = std::make_unique<HWC2::Device>(useVrComposer);
+    mHwcDevice = std::make_unique<HWC2::Device>(serviceName);
     mRemainingHwcVirtualDisplays = mHwcDevice->getMaxVirtualDisplayCount();
 }
 
@@ -444,10 +444,16 @@ status_t HWComposer::prepare(DisplayDevice& displayDevice) {
 
     HWC2::Error error = HWC2::Error::None;
 
-    // First try to skip validate altogether if the HWC supports it.
+    // First try to skip validate altogether when there is no client
+    // composition.  When there is client composition, since we haven't
+    // rendered to the client target yet, we should not attempt to skip
+    // validate.
+    //
+    // displayData.hasClientComposition hasn't been updated for this frame.
+    // The check below is incorrect.  We actually rely on HWC here to fall
+    // back to validate when there is any client layer.
     displayData.validateWasSkipped = false;
-    if (hasCapability(HWC2::Capability::SkipValidate) &&
-            !displayData.hasClientComposition) {
+    if (!displayData.hasClientComposition) {
         sp<android::Fence> outPresentFence;
         uint32_t state = UINT32_MAX;
         error = hwcDisplay->presentOrValidate(&numTypes, &numRequests, &outPresentFence , &state);

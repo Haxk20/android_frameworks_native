@@ -98,8 +98,8 @@ private:
 
 // Device methods
 
-Device::Device(bool useVrComposer)
-  : mComposer(std::make_unique<Hwc2::Composer>(useVrComposer)),
+Device::Device(const std::string& serviceName)
+  : mComposer(std::make_unique<Hwc2::Composer>(serviceName)),
     mCapabilities(),
     mDisplays(),
     mRegisteredCallback(false)
