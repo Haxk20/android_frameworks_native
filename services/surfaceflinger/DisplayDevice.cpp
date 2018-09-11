@@ -297,6 +297,7 @@ DisplayDevice::DisplayDevice(
     }
     mHdrCapabilities = HdrCapabilities(types, maxLuminance, maxAverageLuminance, minLuminance);
 
+
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
 }
@@ -482,7 +483,7 @@ android_color_transform_t DisplayDevice::getColorTransform() const {
 
 void DisplayDevice::setCompositionDataSpace(ui::Dataspace dataspace) {
     mCompositionDataSpace = dataspace;
-    ANativeWindow* const window = mNativeWindow.get();
+    ANativeWindow* const window = FramebufferNativeWindow();
     native_window_set_buffers_data_space(window, static_cast<android_dataspace>(dataspace));
 }
 
@@ -672,7 +673,7 @@ void DisplayDevice::dump(String8& result) const {
     const Transform& tr(mGlobalTransform);
     ANativeWindow* const window = mNativeWindow.get();
     result.appendFormat("+ DisplayDevice: %s\n", mDisplayName.string());
-    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p "
+    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), "
                         "(%d:%d:%d:%d), orient=%2d (type=%08x), "
                         "flips=%u, isSecure=%d, powerMode=%d, activeConfig=%d, numLayers=%zu\n",
                         mType, mHwcDisplayId, mLayerStack, mDisplayWidth, mDisplayHeight, window,
