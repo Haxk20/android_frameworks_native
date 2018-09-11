@@ -119,10 +119,10 @@ DisplayDevice::DisplayDevice(
       mActiveConfig(0)
 {
     // clang-format on
-    Surface* surface;
 #ifdef STE_HARDWARE
     ANativeWindow* const window = new FramebufferNativeWindow();
 #else
+    Surface* surface;
     mNativeWindow = surface = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
 #endif
@@ -175,6 +175,7 @@ DisplayDevice::DisplayDevice(
     // virtual displays are always considered enabled
     mPowerMode = (mType >= DisplayDevice::DISPLAY_VIRTUAL) ?
                   HWC_POWER_MODE_NORMAL : HWC_POWER_MODE_OFF;
+
 
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
@@ -631,11 +632,11 @@ void DisplayDevice::dump(String8& result) const {
     eglGetConfigAttrib(mDisplay, mConfig, EGL_BLUE_SIZE, &blueSize);
     eglGetConfigAttrib(mDisplay, mConfig, EGL_ALPHA_SIZE, &alphaSize);
     result.appendFormat("+ DisplayDevice: %s\n", mDisplayName.string());
-    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p "
+    result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), "
                         "(%d:%d:%d:%d), orient=%2d (type=%08x), "
                         "flips=%u, isSecure=%d, powerMode=%d, activeConfig=%d, numLayers=%zu\n",
                         mType, mHwcDisplayId, mLayerStack, mDisplayWidth, mDisplayHeight,
-                        mNativeWindow.get(), redSize, greenSize, blueSize, alphaSize, mOrientation,
+                        redSize, greenSize, blueSize, alphaSize, mOrientation,
                         tr.getType(), getPageFlipCount(), mIsSecure, mPowerMode, mActiveConfig,
                         mVisibleLayersSortedByZ.size());
     result.appendFormat("   v:[%d,%d,%d,%d], f:[%d,%d,%d,%d], s:[%d,%d,%d,%d],"
