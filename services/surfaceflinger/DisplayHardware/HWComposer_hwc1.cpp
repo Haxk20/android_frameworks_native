@@ -1262,7 +1262,7 @@ void HWComposer::dump(String8& result) const {
     }
 
     if (mHwc && mHwc->dump) {
-        const size_t SIZE = 16*1024;
+        const size_t SIZE = 4096;
         char buffer[SIZE];
         mHwc->dump(mHwc, buffer, SIZE);
         result.append(buffer);
