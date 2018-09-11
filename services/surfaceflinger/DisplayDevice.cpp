@@ -450,7 +450,7 @@ android_color_mode_t DisplayDevice::getActiveColorMode() const {
 }
 
 void DisplayDevice::setCompositionDataSpace(android_dataspace dataspace) {
-    ANativeWindow* const window = mNativeWindow.get();
+    ANativeWindow* const window = new FramebufferNativeWindow();
     native_window_set_buffers_data_space(window, dataspace);
 }
 #endif
