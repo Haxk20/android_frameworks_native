@@ -159,7 +159,6 @@ public:
     status_t getHdrSupport(bool* supported);
 
     status_t getUniqueId(uint64_t* outId) const;
-    status_t getConsumerUsage(uint32_t* outUsage) const;
 
     // Returns the CLOCK_MONOTONIC start time of the last dequeueBuffer call
     nsecs_t getLastDequeueStartTime() const;
@@ -208,8 +207,8 @@ private:
     int dispatchSetBuffersStickyTransform(va_list args);
     int dispatchSetBuffersTimestamp(va_list args);
     int dispatchSetCrop(va_list args);
-    int dispatchSetPostTransformCrop(va_list args);
     int dispatchSetUsage(va_list args);
+    int dispatchSetUsage64(va_list args);
     int dispatchLock(va_list args);
     int dispatchUnlockAndPost(va_list args);
     int dispatchSetSidebandStream(va_list args);
@@ -224,7 +223,6 @@ private:
     int dispatchGetFrameTimestamps(va_list args);
     int dispatchGetWideColorSupport(va_list args);
     int dispatchGetHdrSupport(va_list args);
-    int dispatchGetConsumerUsage64(va_list args);
 
 protected:
     virtual int dequeueBuffer(ANativeWindowBuffer** buffer, int* fenceFd);
@@ -244,7 +242,7 @@ protected:
     virtual int setBuffersTimestamp(int64_t timestamp);
     virtual int setBuffersDataSpace(android_dataspace dataSpace);
     virtual int setCrop(Rect const* rect);
-    virtual int setUsage(uint32_t reqUsage);
+    virtual int setUsage(uint64_t reqUsage);
     virtual void setSurfaceDamage(android_native_rect_t* rects, size_t numRects);
 
 public:
@@ -323,7 +321,7 @@ protected:
 
     // mReqUsage is the set of buffer usage flags that will be requested
     // at the next deuque operation. It is initialized to 0.
-    uint32_t mReqUsage;
+    uint64_t mReqUsage;
 
     // mTimestamp is the timestamp that will be used for the next buffer queue
     // operation. It defaults to NATIVE_WINDOW_TIMESTAMP_AUTO, which means that
