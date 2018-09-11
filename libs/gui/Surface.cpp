@@ -977,6 +977,9 @@ int Surface::perform(int operation, va_list args)
     case NATIVE_WINDOW_SET_USAGE64:
         res = dispatchSetUsage64(args);
         break;
+    case NATIVE_WINDOW_GET_CONSUMER_USAGE64:
+        res = dispatchGetConsumerUsage64(args);
+        break;
     default:
         res = NAME_NOT_FOUND;
         break;
@@ -1153,6 +1156,11 @@ int Surface::dispatchGetWideColorSupport(va_list args) {
 int Surface::dispatchGetHdrSupport(va_list args) {
     bool* outSupport = va_arg(args, bool*);
     return getHdrSupport(outSupport);
+}
+
+int Surface::dispatchGetConsumerUsage64(va_list args) {
+    uint64_t* usage = va_arg(args, uint64_t*);
+    return getConsumerUsage(usage);
 }
 
 int Surface::connect(int api) {
@@ -1722,6 +1730,11 @@ bool Surface::waitForNextFrame(uint64_t lastFrame, nsecs_t timeout) {
 status_t Surface::getUniqueId(uint64_t* outId) const {
     Mutex::Autolock lock(mMutex);
     return mGraphicBufferProducer->getUniqueId(outId);
+}
+
+int Surface::getConsumerUsage(uint64_t* outUsage) const {
+    Mutex::Autolock lock(mMutex);
+    return mGraphicBufferProducer->getConsumerUsage(outUsage);
 }
 
 nsecs_t Surface::getLastDequeueStartTime() const {
