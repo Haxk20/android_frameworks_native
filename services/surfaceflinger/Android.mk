@@ -42,6 +42,9 @@ LOCAL_SRC_FILES := \
 
 LOCAL_MODULE := libsurfaceflinger
 LOCAL_C_INCLUDES := \
+    system/libhidl/base/include \
+    system/libhidl/transport/token/1.0/utils/include \
+    hardware/interfaces/graphics/composer/2.1/utils/command-buffer/include \
     frameworks/native/vulkan/include \
     external/vulkan-validation-layers/libs/vkjson \
     system/libhwbinder/fast_msgq/include \
@@ -64,11 +67,14 @@ LOCAL_CFLAGS += -fvisibility=hidden -Werror=format
 
 LOCAL_STATIC_LIBRARIES := \
     libhwcomposer-command-buffer \
+    libmath \
+    libarect \
     libtrace_proto \
     libvkjson \
     libvr_manager \
     libvrflinger
 
+#    android.hardware.graphics.composer@2.1-command-buffer \
 LOCAL_SHARED_LIBRARIES := \
     android.frameworks.vr.composer@1.0 \
     android.hardware.graphics.allocator@2.0 \
