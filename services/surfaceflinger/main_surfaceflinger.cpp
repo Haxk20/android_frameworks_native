@@ -111,13 +111,11 @@ int main(int, char**) {
     sp<GpuService> gpuservice = new GpuService();
     sm->addService(String16(GpuService::SERVICE_NAME), gpuservice, false);
 
-#ifndef HARDWARE_SCHED_FIFO
     struct sched_param param = {0};
     param.sched_priority = 2;
     if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
         ALOGE("Couldn't set SCHED_FIFO");
     }
-#endif
 
     // run surface flinger in this thread
     flinger->run();

@@ -20,7 +20,6 @@
 #include <sys/types.h>
 
 #include <cutils/compiler.h>
-#include <bfqio/bfqio.h>
 
 #include <gui/IDisplayEventConnection.h>
 #include <gui/DisplayEventReceiver.h>
@@ -93,7 +92,6 @@ void EventThread::sendVsyncHintOnLocked() {
 
 void EventThread::onFirstRef() {
     run("EventThread", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
-    android_set_rt_ioprio(getTid(), 1);
 }
 
 sp<EventThread::Connection> EventThread::createEventConnection() const {
@@ -250,7 +248,7 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 
         // find out connections waiting for events
         size_t count = mDisplayEventConnections.size();
-        for (size_t i=0 ; i<count ; i++) {
+        for (size_t i=0 ; i<count ; ) {
             sp<Connection> connection(mDisplayEventConnections[i].promote());
             if (connection != NULL) {
                 bool added = false;
@@ -281,11 +279,12 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
                     // messages.
                     signalConnections.add(connection);
                 }
+                ++i;
             } else {
                 // we couldn't promote this reference, the connection has
                 // died, so clean-up!
                 mDisplayEventConnections.removeAt(i);
-                --i; --count;
+                --count;
             }
         }
 
