@@ -32,13 +32,11 @@ namespace android {
 
 // ---------------------------------------------------------------------------
 
-DisplayEventReceiver::DisplayEventReceiver() : DisplayEventReceiver(ISurfaceComposer::eVsyncSourceApp) {}
-
 DisplayEventReceiver::DisplayEventReceiver(ISurfaceComposer::VsyncSource vsyncSource) {
     sp<ISurfaceComposer> sf(ComposerService::getComposerService());
-    if (sf != NULL) {
+    if (sf != nullptr) {
         mEventConnection = sf->createDisplayEventConnection(vsyncSource);
-        if (mEventConnection != NULL) {
+        if (mEventConnection != nullptr) {
             mDataChannel = std::make_unique<gui::BitTube>();
             mEventConnection->stealReceiveChannel(mDataChannel.get());
         }
@@ -49,13 +47,13 @@ DisplayEventReceiver::~DisplayEventReceiver() {
 }
 
 status_t DisplayEventReceiver::initCheck() const {
-    if (mDataChannel != NULL)
+    if (mDataChannel != nullptr)
         return NO_ERROR;
     return NO_INIT;
 }
 
 int DisplayEventReceiver::getFd() const {
-    if (mDataChannel == NULL)
+    if (mDataChannel == nullptr)
         return NO_INIT;
 
     return mDataChannel->getFd();
@@ -65,7 +63,7 @@ status_t DisplayEventReceiver::setVsyncRate(uint32_t count) {
     if (int32_t(count) < 0)
         return BAD_VALUE;
 
-    if (mEventConnection != NULL) {
+    if (mEventConnection != nullptr) {
         mEventConnection->setVsyncRate(count);
         return NO_ERROR;
     }
@@ -73,7 +71,7 @@ status_t DisplayEventReceiver::setVsyncRate(uint32_t count) {
 }
 
 status_t DisplayEventReceiver::requestNextVsync() {
-    if (mEventConnection != NULL) {
+    if (mEventConnection != nullptr) {
         mEventConnection->requestNextVsync();
         return NO_ERROR;
     }

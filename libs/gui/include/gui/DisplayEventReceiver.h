@@ -84,15 +84,8 @@ public:
      * or requestNextVsync to receive them.
      * Other events start being delivered immediately.
      */
-    DisplayEventReceiver();
-
-    /*
-     * DisplayEventReceiver creates and registers an event connection with
-     * SurfaceFlinger. VSync events are disabled by default. Call setVSyncRate
-     * or requestNextVsync to receive them.
-     * Other events start being delivered immediately.
-     */
-    DisplayEventReceiver(ISurfaceComposer::VsyncSource vsyncSource);
+    DisplayEventReceiver(
+            ISurfaceComposer::VsyncSource vsyncSource = ISurfaceComposer::eVsyncSourceApp);
 
     /*
      * ~DisplayEventReceiver severs the connection with SurfaceFlinger, new events
