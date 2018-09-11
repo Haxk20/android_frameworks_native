@@ -97,20 +97,6 @@
 
 extern "C" EGLAPI const char* eglQueryStringImplementationANDROID(EGLDisplay dpy, EGLint name);
 
-static int convertRotation(android::Transform::orientation_flags rotation)
-{
-    switch (rotation) {
-        case android::Transform::ROT_90:
-            return 1;
-        case android::Transform::ROT_180:
-            return 2;
-        case android::Transform::ROT_270:
-            return 3;
-        default:
-            return 0;
-    }
-}
-
 namespace android {
 // ---------------------------------------------------------------------------
 
@@ -221,10 +207,6 @@ SurfaceFlinger::SurfaceFlinger()
     property_get("ro.sf.disable_triple_buffer", value, "1");
     mLayerTripleBufferingDisabled = atoi(value);
     ALOGI_IF(mLayerTripleBufferingDisabled, "Disabling Triple Buffering");
-
-    // we store the value as orientation:
-    // 90 -> 1, 180 -> 2, 270 -> 3
-    mHardwareRotation = property_get_int32("ro.sf.hwrotation", 0) / 90;
 }
 
 void SurfaceFlinger::onFirstRef()
@@ -327,6 +309,9 @@ void SurfaceFlinger::createBuiltinDisplayLocked(DisplayDevice::DisplayType type)
     mBuiltinDisplays[type] = new BBinder();
     // All non-virtual displays are currently considered secure.
     DisplayDeviceState info(type, true);
+    info.displayName =
+            type== DisplayDevice::DISPLAY_PRIMARY ? "Built-in Screen" : "External Screen";
+
     mCurrentState.displays.add(mBuiltinDisplays[type], info);
     mInterceptor.saveDisplayCreation(info);
 }
@@ -543,7 +528,6 @@ void SurfaceFlinger::init() {
     mSFEventThread = new EventThread(sfVsyncSrc, *this, true);
     mEventQueue.setEventThread(mSFEventThread);
 
-#ifndef HARDWARE_SCHED_FIFO
     // set EventThread and SFEventThread to SCHED_FIFO to minimize jitter
     struct sched_param param = {0};
     param.sched_priority = 2;
@@ -553,7 +537,7 @@ void SurfaceFlinger::init() {
     if (sched_setscheduler(mEventThread->getTid(), SCHED_FIFO, &param) != 0) {
         ALOGE("Couldn't set SCHED_FIFO for EventThread");
     }
-#endif
+
     // Initialize the H/W composer object.  There may or may not be an
     // actual hardware composer underneath.
     mHwc.reset(new HWComposer(this,
@@ -745,18 +729,10 @@ status_t SurfaceFlinger::getDisplayConfigs(const sp<IBinder>& display,
             info.orientation = 0;
         }
 
-        if ((type == DisplayDevice::DISPLAY_PRIMARY) &&
-                (mHardwareRotation & DisplayState::eOrientationSwapMask)) {
-            info.h = hwConfig.width;
-            info.w = hwConfig.height;
-            info.xdpi = ydpi;
-            info.ydpi = xdpi;
-        } else {
-            info.w = hwConfig.width;
-            info.h = hwConfig.height;
-            info.xdpi = xdpi;
-            info.ydpi = ydpi;
-        }
+        info.w = hwConfig.width;
+        info.h = hwConfig.height;
+        info.xdpi = xdpi;
+        info.ydpi = ydpi;
         info.fps = float(1e9 / hwConfig.refresh);
         info.appVsyncOffset = vsyncPhaseOffsetNs;
 
@@ -2635,6 +2611,14 @@ uint32_t SurfaceFlinger::setClientStateLocked(
                 }
             }
         }
+        if (what & layer_state_t::eRelativeLayerChanged) {
+            ssize_t idx = mCurrentState.layersSortedByZ.indexOf(layer);
+            if (layer->setRelativeLayer(s.relativeLayerHandle, s.z)) {
+                mCurrentState.layersSortedByZ.removeAt(idx);
+                mCurrentState.layersSortedByZ.add(layer);
+                flags |= eTransactionNeeded|eTraversalNeeded;
+            }
+        }
         if (what & layer_state_t::eSizeChanged) {
             if (layer->setSize(s.w, s.h)) {
                 flags |= eTraversalNeeded;
@@ -2940,21 +2924,17 @@ void SurfaceFlinger::setPowerModeInternal(const sp<DisplayDevice>& hw,
         mHasPoweredOff = true;
         repaintEverything();
 
-#ifndef HARDWARE_SCHED_FIFO
         struct sched_param param = {0};
         param.sched_priority = 1;
         if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
             ALOGW("Couldn't set SCHED_FIFO on display on");
         }
-#endif
     } else if (mode == HWC_POWER_MODE_OFF) {
-#ifndef HARDWARE_SCHED_FIFO
         // Turn off the display
         struct sched_param param = {0};
         if (sched_setscheduler(0, SCHED_OTHER, &param) != 0) {
             ALOGW("Couldn't set SCHED_OTHER on display off");
         }
-#endif
 
         if (type == DisplayDevice::DISPLAY_PRIMARY) {
             disableHardwareVsync(true); // also cancels any in-progress resync
@@ -3679,7 +3659,6 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
     uint32_t code;
     Parcel const* data;
     Parcel* reply;
-    Mutex mLock;
 
     enum {
         MSG_API_CALL,
@@ -3693,7 +3672,6 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
      */
     virtual status_t transact(uint32_t code,
             const Parcel& data, Parcel* reply, uint32_t /* flags */) {
-        mLock.lock(); 
         this->code = code;
         this->data = &data;
         this->reply = reply;
@@ -3711,7 +3689,6 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
             looper->sendMessage(this, Message(MSG_API_CALL));
             barrier.wait();
         }
-        mLock.unlock();
         return result;
     }
 
@@ -3950,20 +3927,8 @@ status_t SurfaceFlinger::captureScreenImplLocked(
     uint32_t hw_w = hw->getWidth();
     uint32_t hw_h = hw->getHeight();
 
-    switch ((convertRotation(rotation) + mHardwareRotation) % 4) {
-        case 1:
-            std::swap(hw_w, hw_h);
-            rotation = Transform::ROT_90;
-            break;
-        case 2:
-            rotation = Transform::ROT_180;
-            break;
-        case 3:
-            std::swap(hw_w, hw_h);
-            rotation = Transform::ROT_270;
-            break;
-        default:
-            break;
+    if (rotation & Transform::ROT_90) {
+        std::swap(hw_w, hw_h);
     }
 
     if ((reqWidth > hw_w) || (reqHeight > hw_h)) {

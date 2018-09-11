@@ -27,6 +27,7 @@
 #include <utils/String8.h>
 #include <utils/Timers.h>
 
+#include <ui/FloatRect.h>
 #include <ui/FrameStats.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/PixelFormat.h>
@@ -258,8 +259,8 @@ public:
 
     void computeGeometry(const sp<const DisplayDevice>& hw, Mesh& mesh,
             bool useIdentityTransform) const;
-    Rect computeBounds(const Region& activeTransparentRegion) const;
-    Rect computeBounds() const;
+    FloatRect computeBounds(const Region& activeTransparentRegion) const;
+    FloatRect computeBounds() const;
 
     int32_t getSequence() const { return sequence; }
 
@@ -454,7 +455,7 @@ public:
     // -----------------------------------------------------------------------
 
     bool createHwcLayer(HWComposer* hwc, int32_t hwcId);
-    void destroyHwcLayer(int32_t hwcId);
+    bool destroyHwcLayer(int32_t hwcId);
     void destroyAllHwcLayers();
 
     bool hasHwcLayer(int32_t hwcId) {
