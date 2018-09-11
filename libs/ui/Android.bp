@@ -76,7 +76,9 @@ cc_library_shared {
 
     shared_libs: [
         "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.common@1.1",
         "android.hardware.graphics.mapper@2.0",
+        "android.hardware.graphics.mapper@2.1",
         "android.hardware.configstore@1.0",
         "android.hardware.configstore-utils",
         "libbase",
@@ -91,6 +93,10 @@ cc_library_shared {
         "liblog",
     ],
 
+    export_shared_lib_headers: [
+        "android.hardware.graphics.common@1.1",
+    ],
+
     static_libs: [
         "libarect",
         "libgrallocusage",
@@ -100,6 +106,7 @@ cc_library_shared {
     header_libs: [
         "libnativebase_headers",
         "libhardware_headers",
+        "libpdx_headers",
     ],
 
     export_include_dirs: ["include"],

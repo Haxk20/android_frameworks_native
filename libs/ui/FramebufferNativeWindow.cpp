@@ -53,7 +53,7 @@ public:
         ANativeWindowBuffer::width  = w;
         ANativeWindowBuffer::height = h;
         ANativeWindowBuffer::format = f;
-        ANativeWindowBuffer::usage  = u;
+        ANativeWindowBuffer::usage  = static_cast<uint64_t>(u);
     }
 private:
     friend class LightRefBase<NativeBuffer>;
