@@ -257,16 +257,16 @@ DisplayDevice::DisplayDevice(
     // clang-format on
     populateColorModes(hwcColorModes);
 
-    std::vector<int32_t> types = hdrCapabilities.getSupportedHdrTypes();
-    for (int32_t hdrType : types) {
+    std::vector<Hdr> types = hdrCapabilities.getSupportedHdrTypes();
+    for (Hdr hdrType : types) {
         switch (hdrType) {
-            case static_cast<int32_t>(Hdr::HDR10):
+            case Hdr::HDR10:
                 mHasHdr10 = true;
                 break;
-            case static_cast<int32_t>(Hdr::HLG):
+            case Hdr::HLG:
                 mHasHLG = true;
                 break;
-            case static_cast<int32_t>(Hdr::DOLBY_VISION):
+            case Hdr::DOLBY_VISION:
                 mHasDolbyVision = true;
                 break;
             default:
@@ -285,11 +285,11 @@ DisplayDevice::DisplayDevice(
         // insert HDR10/HLG as we will force client composition for HDR10/HLG
         // layers
         if (!hasHDR10Support()) {
-          types.push_back(static_cast<int32_t>(Hdr::HDR10));
+          types.push_back(Hdr::HDR10);
         }
 
         if (!hasHLGSupport()) {
-          types.push_back(static_cast<int32_t>(Hdr::HLG));
+          types.push_back(Hdr::HLG);
         }
     }
     mHdrCapabilities = HdrCapabilities(types, maxLuminance, maxAverageLuminance, minLuminance);
