@@ -273,25 +273,7 @@ SurfaceFlinger::SurfaceFlinger() : SurfaceFlinger(SkipInitialization) {
     hasWideColorDisplay =
             getBool<ISurfaceFlingerConfigs, &ISurfaceFlingerConfigs::hasWideColorDisplay>(false);
 
-    V1_1::DisplayOrientation primaryDisplayOrientation =
-        getDisplayOrientation< V1_1::ISurfaceFlingerConfigs, &V1_1::ISurfaceFlingerConfigs::primaryDisplayOrientation>(
-            V1_1::DisplayOrientation::ORIENTATION_0);
-
-    switch (primaryDisplayOrientation) {
-        case V1_1::DisplayOrientation::ORIENTATION_90:
-            mPrimaryDisplayOrientation = DisplayState::eOrientation90;
-            break;
-        case V1_1::DisplayOrientation::ORIENTATION_180:
-            mPrimaryDisplayOrientation = DisplayState::eOrientation180;
-            break;
-        case V1_1::DisplayOrientation::ORIENTATION_270:
-            mPrimaryDisplayOrientation = DisplayState::eOrientation270;
-            break;
-        default:
-            mPrimaryDisplayOrientation = DisplayState::eOrientationDefault;
-            break;
-    }
-    ALOGV("Primary Display Orientation is set to %2d.", mPrimaryDisplayOrientation);
+    mPrimaryDisplayOrientation = DisplayState::eOrientationDefault;
 
     mPrimaryDispSync.init(SurfaceFlinger::hasSyncFramework, SurfaceFlinger::dispSyncPresentTimeOffset);
 
