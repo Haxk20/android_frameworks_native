@@ -16,11 +16,10 @@ namespace dvr {
 class DirectoryReader {
  public:
   explicit DirectoryReader(base::unique_fd directory_fd) {
-    int fd = directory_fd.release();
-    directory_ = fdopendir(fd);
+    directory_ = fdopendir(directory_fd.get());
     error_ = errno;
-    if (directory_ == nullptr)
-      close(fd);
+    if (directory_ != nullptr)
+      (void) directory_fd.release(); // ignore return result?
   }
 
   ~DirectoryReader() {
