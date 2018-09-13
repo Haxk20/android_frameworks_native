@@ -42,7 +42,7 @@ class BufferHubQueueProducer : public BnGraphicBufferProducer {
 
   // See |IGraphicBufferProducer::dequeueBuffer|
   status_t dequeueBuffer(int* out_slot, sp<Fence>* out_fence, uint32_t width,
-                         uint32_t height, PixelFormat format, uint32_t usage,
+                         uint32_t height, PixelFormat format, uint64_t usage,
                          uint64_t* outBufferAge,
                          FrameEventHistoryDelta* outTimestamps) override;
 
@@ -81,7 +81,7 @@ class BufferHubQueueProducer : public BnGraphicBufferProducer {
 
   // See |IGraphicBufferProducer::allocateBuffers|
   void allocateBuffers(uint32_t width, uint32_t height, PixelFormat format,
-                       uint32_t usage) override;
+                       uint64_t usage) override;
 
   // See |IGraphicBufferProducer::allowAllocation|
   status_t allowAllocation(bool allow) override;
@@ -113,7 +113,7 @@ class BufferHubQueueProducer : public BnGraphicBufferProducer {
   status_t getUniqueId(uint64_t* out_id) const override;
 
   // See |IGraphicBufferProducer::getConsumerUsage|
-  status_t getConsumerUsage(uint32_t* out_usage) const override;
+  status_t getConsumerUsage(uint64_t* out_usage) const override;
 
  private:
   using LocalHandle = pdx::LocalHandle;
