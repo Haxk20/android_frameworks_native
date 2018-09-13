@@ -2,7 +2,3 @@ cc_library_static {
     name: "libsurfaceflingerincludes",
     export_include_dirs: ["."],
 }
-subdirs = [
-    "layerproto",
-    "TimeStats/timestatsproto",
-]

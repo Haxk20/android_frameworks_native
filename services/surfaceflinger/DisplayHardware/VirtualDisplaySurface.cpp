@@ -16,9 +16,6 @@
 
 // #define LOG_NDEBUG 0
 #include "VirtualDisplaySurface.h"
-
-#include <inttypes.h>
-
 #include "HWComposer.h"
 #include "SurfaceFlinger.h"
 
@@ -342,7 +339,7 @@ status_t VirtualDisplaySurface::setAsyncMode(bool async) {
 }
 
 status_t VirtualDisplaySurface::dequeueBuffer(Source source,
-        PixelFormat format, uint64_t usage, int* sslot, sp<Fence>* fence) {
+        PixelFormat format, uint32_t usage, int* sslot, sp<Fence>* fence) {
     LOG_FATAL_IF(mDisplayId < 0, "mDisplayId=%d but should not be < 0.", mDisplayId);
 
     status_t result =
@@ -386,7 +383,7 @@ status_t VirtualDisplaySurface::dequeueBuffer(Source source,
 }
 
 status_t VirtualDisplaySurface::dequeueBuffer(int* pslot, sp<Fence>* fence, uint32_t w, uint32_t h,
-                                              PixelFormat format, uint64_t usage,
+                                              PixelFormat format, uint32_t usage,
                                               uint64_t* outBufferAge,
                                               FrameEventHistoryDelta* outTimestamps) {
     if (mDisplayId < 0) {
@@ -398,7 +395,7 @@ status_t VirtualDisplaySurface::dequeueBuffer(int* pslot, sp<Fence>* fence, uint
             "Unexpected dequeueBuffer() in %s state", dbgStateStr());
     mDbgState = DBG_STATE_GLES;
 
-    VDS_LOGV("dequeueBuffer %dx%d fmt=%d usage=%#" PRIx64, w, h, format, usage);
+    VDS_LOGV("dequeueBuffer %dx%d fmt=%d usage=%#x", w, h, format, usage);
 
     status_t result = NO_ERROR;
     Source source = fbSourceForCompositionType(mCompositionType);
@@ -583,7 +580,7 @@ status_t VirtualDisplaySurface::setSidebandStream(const sp<NativeHandle>& /*stre
 }
 
 void VirtualDisplaySurface::allocateBuffers(uint32_t /* width */,
-        uint32_t /* height */, PixelFormat /* format */, uint64_t /* usage */) {
+        uint32_t /* height */, PixelFormat /* format */, uint32_t /* usage */) {
     // TODO: Should we actually allocate buffers for a virtual display?
 }
 
@@ -627,7 +624,7 @@ status_t VirtualDisplaySurface::getUniqueId(uint64_t* /*outId*/) const {
     return INVALID_OPERATION;
 }
 
-status_t VirtualDisplaySurface::getConsumerUsage(uint64_t* outUsage) const {
+status_t VirtualDisplaySurface::getConsumerUsage(uint32_t* outUsage) const {
     return mSource[SOURCE_SINK]->getConsumerUsage(outUsage);
 }
 

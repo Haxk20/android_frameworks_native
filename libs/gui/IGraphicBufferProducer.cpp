@@ -126,7 +126,7 @@ public:
     }
 
     virtual status_t dequeueBuffer(int* buf, sp<Fence>* fence, uint32_t width, uint32_t height,
-                                   PixelFormat format, uint64_t usage, uint64_t* outBufferAge,
+                                   PixelFormat format, uint32_t usage, uint64_t* outBufferAge,
                                    FrameEventHistoryDelta* outTimestamps) {
         Parcel data, reply;
         bool getFrameTimestamps = (outTimestamps != nullptr);
@@ -135,7 +135,7 @@ public:
         data.writeUint32(width);
         data.writeUint32(height);
         data.writeInt32(static_cast<int32_t>(format));
-        data.writeUint64(usage);
+        data.writeUint32(usage);
         data.writeBool(getFrameTimestamps);
 
         status_t result = remote()->transact(DEQUEUE_BUFFER, data, &reply);
@@ -345,13 +345,13 @@ public:
     }
 
     virtual void allocateBuffers(uint32_t width, uint32_t height,
-            PixelFormat format, uint64_t usage) {
+            PixelFormat format, uint32_t usage) {
         Parcel data, reply;
         data.writeInterfaceToken(IGraphicBufferProducer::getInterfaceDescriptor());
         data.writeUint32(width);
         data.writeUint32(height);
         data.writeInt32(static_cast<int32_t>(format));
-        data.writeUint64(usage);
+        data.writeUint32(usage);
         status_t result = remote()->transact(ALLOCATE_BUFFERS, data, &reply);
         if (result != NO_ERROR) {
             ALOGE("allocateBuffers failed to transact: %d", result);
@@ -506,7 +506,7 @@ public:
         return actualResult;
     }
 
-    virtual status_t getConsumerUsage(uint64_t* outUsage) const {
+    virtual status_t getConsumerUsage(uint32_t* outUsage) const {
         Parcel data, reply;
         data.writeInterfaceToken(IGraphicBufferProducer::getInterfaceDescriptor());
         status_t result = remote()->transact(GET_CONSUMER_USAGE, data, &reply);
@@ -518,7 +518,7 @@ public:
         if (result != NO_ERROR) {
             return result;
         }
-        result = reply.readUint64(outUsage);
+        result = reply.readUint32(outUsage);
         if (result != NO_ERROR) {
             return result;
         }
@@ -548,7 +548,7 @@ public:
     }
 
     status_t dequeueBuffer(int* slot, sp<Fence>* fence, uint32_t w, uint32_t h, PixelFormat format,
-                           uint64_t usage, uint64_t* outBufferAge,
+                           uint32_t usage, uint64_t* outBufferAge,
                            FrameEventHistoryDelta* outTimestamps) override {
         return mBase->dequeueBuffer(slot, fence, w, h, format, usage, outBufferAge, outTimestamps);
     }
@@ -599,7 +599,7 @@ public:
     }
 
     void allocateBuffers(uint32_t width, uint32_t height,
-            PixelFormat format, uint64_t usage) override {
+            PixelFormat format, uint32_t usage) override {
         return mBase->allocateBuffers(width, height, format, usage);
     }
 
@@ -643,7 +643,7 @@ public:
         return mBase->getUniqueId(outId);
     }
 
-    status_t getConsumerUsage(uint64_t* outUsage) const override {
+    status_t getConsumerUsage(uint32_t* outUsage) const override {
         return mBase->getConsumerUsage(outUsage);
     }
 };
@@ -688,7 +688,7 @@ status_t BnGraphicBufferProducer::onTransact(
             uint32_t width = data.readUint32();
             uint32_t height = data.readUint32();
             PixelFormat format = static_cast<PixelFormat>(data.readInt32());
-            uint64_t usage = data.readUint64();
+            uint32_t usage = data.readUint32();
             uint64_t bufferAge = 0;
             bool getTimestamps = data.readBool();
 
@@ -813,7 +813,7 @@ status_t BnGraphicBufferProducer::onTransact(
             uint32_t width = data.readUint32();
             uint32_t height = data.readUint32();
             PixelFormat format = static_cast<PixelFormat>(data.readInt32());
-            uint64_t usage = data.readUint64();
+            uint32_t usage = data.readUint32();
             allocateBuffers(width, height, format, usage);
             return NO_ERROR;
         }
@@ -915,13 +915,13 @@ status_t BnGraphicBufferProducer::onTransact(
         }
         case GET_CONSUMER_USAGE: {
             CHECK_INTERFACE(IGraphicBufferProducer, data, reply);
-            uint64_t outUsage = 0;
+            uint32_t outUsage = 0;
             status_t actualResult = getConsumerUsage(&outUsage);
             status_t result = reply->writeInt32(actualResult);
             if (result != NO_ERROR) {
                 return result;
             }
-            result = reply->writeUint64(outUsage);
+            result = reply->writeUint32(outUsage);
             if (result != NO_ERROR) {
                 return result;
             }
