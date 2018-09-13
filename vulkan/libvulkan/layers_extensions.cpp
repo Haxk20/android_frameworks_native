@@ -29,9 +29,10 @@
 #include <android/dlext.h>
 #include <android-base/strings.h>
 #include <cutils/properties.h>
-#include <graphicsenv/GraphicsEnv.h>
 #include <log/log.h>
 #include <ziparchive/zip_archive.h>
+
+#include <vulkan/vulkan_loader_data.h>
 
 // TODO(jessehall): The whole way we deal with extensions is pretty hokey, and
 // not a good long-term solution. Having a hard-coded enum of extensions is
@@ -68,16 +69,11 @@ const char kSystemLayerLibraryDir[] = "/data/local/debug/vulkan";
 
 class LayerLibrary {
    public:
-    explicit LayerLibrary(const std::string& path,
-                          const std::string& filename)
-        : path_(path),
-          filename_(filename),
-          dlhandle_(nullptr),
-          refcount_(0) {}
+    explicit LayerLibrary(const std::string& path)
+        : path_(path), dlhandle_(nullptr), refcount_(0) {}
 
     LayerLibrary(LayerLibrary&& other)
         : path_(std::move(other.path_)),
-          filename_(std::move(other.filename_)),
           dlhandle_(other.dlhandle_),
           refcount_(other.refcount_) {
         other.dlhandle_ = nullptr;
@@ -98,13 +94,8 @@ class LayerLibrary {
                  const char* gpa_name,
                  size_t gpa_name_len) const;
 
-    const std::string GetFilename() { return filename_; }
-
    private:
     const std::string path_;
-
-    // Track the filename alone so we can detect duplicates
-    const std::string filename_;
 
     std::mutex mutex_;
     void* dlhandle_;
@@ -120,7 +111,7 @@ bool LayerLibrary::Open() {
         // any symbol dependencies will be resolved by system libraries. They
         // can't safely use libc++_shared, for example. Which is one reason
         // (among several) we only allow them in non-user builds.
-        auto app_namespace = android::GraphicsEnv::getInstance().getAppNamespace();
+        auto app_namespace = LoaderData::GetInstance().app_namespace;
         if (app_namespace &&
             !android::base::StartsWith(path_, kSystemLayerLibraryDir)) {
             android_dlextinfo dlextinfo = {};
@@ -314,8 +305,8 @@ void* LayerLibrary::GetGPA(const Layer& layer,
 std::vector<LayerLibrary> g_layer_libraries;
 std::vector<Layer> g_instance_layers;
 
-void AddLayerLibrary(const std::string& path, const std::string& filename) {
-    LayerLibrary library(path + "/" + filename, filename);
+void AddLayerLibrary(const std::string& path) {
+    LayerLibrary library(path);
     if (!library.Open())
         return;
 
@@ -407,25 +398,7 @@ void DiscoverLayersInPathList(const std::string& pathstr) {
         ForEachFileInPath(path, [&](const std::string& filename) {
             if (android::base::StartsWith(filename, "libVkLayer") &&
                 android::base::EndsWith(filename, ".so")) {
-
-                // Check to ensure we haven't seen this layer already
-                // Let the first instance of the shared object be enumerated
-                // We're searching for layers in following order:
-                // 1. system path
-                // 2. libraryPermittedPath (if enabled)
-                // 3. libraryPath
-
-                bool duplicate = false;
-                for (auto& layer : g_layer_libraries) {
-                    if (layer.GetFilename() == filename) {
-                        ALOGV("Skipping duplicate layer %s in %s",
-                              filename.c_str(), path.c_str());
-                        duplicate = true;
-                    }
-                }
-
-                if (!duplicate)
-                    AddLayerLibrary(path, filename);
+                AddLayerLibrary(path + "/" + filename);
             }
         });
     }
@@ -455,8 +428,8 @@ void DiscoverLayers() {
         prctl(PR_GET_DUMPABLE, 0, 0, 0, 0)) {
         DiscoverLayersInPathList(kSystemLayerLibraryDir);
     }
-    if (!android::GraphicsEnv::getInstance().getLayerPaths().empty())
-        DiscoverLayersInPathList(android::GraphicsEnv::getInstance().getLayerPaths());
+    if (!LoaderData::GetInstance().layer_path.empty())
+        DiscoverLayersInPathList(LoaderData::GetInstance().layer_path);
 }
 
 uint32_t GetLayerCount() {
