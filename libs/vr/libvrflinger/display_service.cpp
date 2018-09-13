@@ -38,12 +38,10 @@ namespace android {
 namespace dvr {
 
 DisplayService::DisplayService(Hwc2::Composer* hidl,
-                               hwc2_display_t primary_display_id,
                                RequestDisplayCallback request_display_callback)
     : BASE("DisplayService",
            Endpoint::Create(display::DisplayProtocol::kClientPath)) {
-    hardware_composer_.Initialize(
-        hidl, primary_display_id, request_display_callback);
+  hardware_composer_.Initialize(hidl, request_display_callback);
 }
 
 bool DisplayService::IsInitialized() const {
@@ -177,12 +175,12 @@ Status<void> DisplayService::HandleMessage(pdx::Message& message) {
 
 Status<display::Metrics> DisplayService::OnGetMetrics(
     pdx::Message& /*message*/) {
-  const auto& params = hardware_composer_.GetPrimaryDisplayParams();
-  return {{static_cast<uint32_t>(params.width),
-           static_cast<uint32_t>(params.height),
-           static_cast<uint32_t>(params.dpi.x),
-           static_cast<uint32_t>(params.dpi.y),
-           static_cast<uint32_t>(params.vsync_period_ns),
+  return {{static_cast<uint32_t>(GetDisplayMetrics().width),
+           static_cast<uint32_t>(GetDisplayMetrics().height),
+           static_cast<uint32_t>(GetDisplayMetrics().dpi.x),
+           static_cast<uint32_t>(GetDisplayMetrics().dpi.y),
+           static_cast<uint32_t>(
+               hardware_composer_.native_display_metrics().vsync_period_ns),
            0,
            0,
            0,

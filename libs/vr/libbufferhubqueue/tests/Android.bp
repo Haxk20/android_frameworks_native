@@ -6,21 +6,20 @@ header_libraries = [
 shared_libraries = [
     "libbase",
     "libbinder",
-    "libbufferhubqueue",
     "libcutils",
     "libgui",
     "liblog",
     "libhardware",
     "libui",
     "libutils",
-    "libnativewindow",
-    "libpdx_default_transport",
 ]
 
 static_libraries = [
+    "libbufferhubqueue",
+    "libbufferhub",
     "libchrome",
     "libdvrcommon",
-    "libperformance",
+    "libpdx_default_transport",
 ]
 
 cc_test {
@@ -38,7 +37,6 @@ cc_test {
         "-Wno-error=sign-compare", // to fix later
     ],
     name: "buffer_hub_queue-test",
-    tags: ["optional"],
 }
 
 cc_test {
@@ -55,5 +53,4 @@ cc_test {
         "-Werror",
     ],
     name: "buffer_hub_queue_producer-test",
-    tags: ["optional"],
 }

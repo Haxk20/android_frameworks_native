@@ -22,12 +22,6 @@ cc_library_static {
         "service_dispatcher.cpp",
         "status.cpp",
     ],
-    shared_libs: [
-        "libbinder",
-        "libcutils",
-        "libutils",
-        "liblog",
-    ],
 }
 
 cc_test {

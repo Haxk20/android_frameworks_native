@@ -44,17 +44,17 @@
 #include <gui/ISurfaceComposer.h>
 #include <gui/ISurfaceComposerClient.h>
 #include <gui/OccupancyTracker.h>
-#include <gui/LayerState.h>
 
 #include <hardware/hwcomposer_defs.h>
 
 #include <system/graphics.h>
 
+#include <private/gui/LayerState.h>
+
 #include "Barrier.h"
 #include "DisplayDevice.h"
 #include "DispSync.h"
 #include "FrameTracker.h"
-#include "LayerStats.h"
 #include "LayerVector.h"
 #include "MessageQueue.h"
 #include "SurfaceInterceptor.h"

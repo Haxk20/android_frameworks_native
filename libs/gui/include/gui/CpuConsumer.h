@@ -94,6 +94,12 @@ class CpuConsumer : public ConsumerBase
     CpuConsumer(const sp<IGraphicBufferConsumer>& bq,
             size_t maxLockedBuffers, bool controlledByApp = false);
 
+    virtual ~CpuConsumer();
+
+    // set the name of the CpuConsumer that will be used to identify it in
+    // log messages.
+    void setName(const String8& name);
+
     // Gets the next graphics buffer from the producer and locks it for CPU use,
     // filling out the passed-in locked buffer structure with the native pointer
     // and metadata. Returns BAD_VALUE if no new buffer is available, and
@@ -113,39 +119,31 @@ class CpuConsumer : public ConsumerBase
 
   private:
     // Maximum number of buffers that can be locked at a time
-    const size_t mMaxLockedBuffers;
+    size_t mMaxLockedBuffers;
+
+    status_t releaseAcquiredBufferLocked(size_t lockedIdx);
+
+    virtual void freeBufferLocked(int slotIndex);
 
     // Tracking for buffers acquired by the user
     struct AcquiredBuffer {
-        static constexpr uintptr_t kUnusedId = 0;
-
         // Need to track the original mSlot index and the buffer itself because
         // the mSlot entry may be freed/reused before the acquired buffer is
         // released.
         int mSlot;
         sp<GraphicBuffer> mGraphicBuffer;
-        uintptr_t mLockedBufferId;
+        void *mBufferPointer;
 
         AcquiredBuffer() :
                 mSlot(BufferQueue::INVALID_BUFFER_SLOT),
-                mLockedBufferId(kUnusedId) {
-        }
-
-        void reset() {
-            mSlot = BufferQueue::INVALID_BUFFER_SLOT;
-            mGraphicBuffer.clear();
-            mLockedBufferId = kUnusedId;
+                mBufferPointer(NULL) {
         }
     };
-
-    size_t findAcquiredBufferLocked(uintptr_t id) const;
-
-    status_t lockBufferItem(const BufferItem& item, LockedBuffer* outBuffer) const;
-
     Vector<AcquiredBuffer> mAcquiredBuffers;
 
     // Count of currently locked buffers
     size_t mCurrentLockedBuffers;
+
 };
 
 } // namespace android

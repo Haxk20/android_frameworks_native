@@ -38,6 +38,10 @@ public:
         PRESENT_LATER = IGraphicBufferConsumer::PRESENT_LATER,
     };
 
+#ifdef STE_HARDWARE
+    enum { NUM_BLIT_BUFFER_SLOTS = 2 };
+#endif
+
     // When in async mode we reserve two slots in order to guarantee that the
     // producer and consumer can run asynchronously.
     enum { MAX_MAX_ACQUIRED_BUFFERS = NUM_BUFFER_SLOTS - 2 };
@@ -78,12 +82,6 @@ public:
     static void createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
             sp<IGraphicBufferConsumer>* outConsumer,
             bool consumerIsSurfaceFlinger = false);
-
-#ifndef NO_BUFFERHUB
-    // Creates an IGraphicBufferProducer and IGraphicBufferConsumer pair backed by BufferHub.
-    static void createBufferHubQueue(sp<IGraphicBufferProducer>* outProducer,
-                                     sp<IGraphicBufferConsumer>* outConsumer);
-#endif
 
     BufferQueue() = delete; // Create through createBufferQueue
 };

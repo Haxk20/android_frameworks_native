@@ -32,19 +32,21 @@ VSyncService::VSyncService()
 
 VSyncService::~VSyncService() {}
 
-void VSyncService::VSyncEvent(int64_t timestamp_ns,
+void VSyncService::VSyncEvent(int display, int64_t timestamp_ns,
                               int64_t compositor_time_ns,
                               uint32_t vsync_count) {
   ATRACE_NAME("VSyncService::VSyncEvent");
   std::lock_guard<std::mutex> autolock(mutex_);
 
-  last_vsync_ = current_vsync_;
-  current_vsync_ = timestamp_ns;
-  compositor_time_ns_ = compositor_time_ns;
-  current_vsync_count_ = vsync_count;
+  if (display == HWC_DISPLAY_PRIMARY) {
+    last_vsync_ = current_vsync_;
+    current_vsync_ = timestamp_ns;
+    compositor_time_ns_ = compositor_time_ns;
+    current_vsync_count_ = vsync_count;
 
-  NotifyWaiters();
-  UpdateClients();
+    NotifyWaiters();
+    UpdateClients();
+  }
 }
 
 std::shared_ptr<Channel> VSyncService::OnChannelOpen(pdx::Message& message) {

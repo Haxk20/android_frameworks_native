@@ -23,9 +23,6 @@ class IonBuffer {
   IonBuffer(IonBuffer&& other);
   IonBuffer& operator=(IonBuffer&& other);
 
-  // Returns check this IonBuffer holds a valid Gralloc buffer.
-  bool IsValid() const { return buffer_ && buffer_->initCheck() == NO_ERROR; }
-
   // Frees the underlying native handle and leaves the instance initialized to
   // empty.
   void FreeHandle();
@@ -69,7 +66,6 @@ class IonBuffer {
               struct android_ycbcr* yuv);
   int Unlock();
 
-  sp<GraphicBuffer>& buffer() { return buffer_; }
   const sp<GraphicBuffer>& buffer() const { return buffer_; }
   buffer_handle_t handle() const {
     return buffer_.get() ? buffer_->handle : nullptr;

@@ -20,8 +20,6 @@
 
 #include <gui/Surface.h>
 
-#include <inttypes.h>
-
 #include <android/native_window.h>
 
 #include <utils/Log.h>
@@ -43,9 +41,6 @@
 #include <configstore/Utils.h>
 
 namespace android {
-
-using ui::ColorMode;
-using ui::Dataspace;
 
 Surface::Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controlledByApp)
       : mGraphicBufferProducer(bufferProducer),
@@ -81,7 +76,7 @@ Surface::Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controll
     mReqFormat = 0;
     mReqUsage = 0;
     mTimestamp = NATIVE_WINDOW_TIMESTAMP_AUTO;
-    mDataSpace = Dataspace::UNKNOWN;
+    mDataSpace = HAL_DATASPACE_UNKNOWN;
     mScalingMode = NATIVE_WINDOW_SCALING_MODE_FREEZE;
     mTransform = 0;
     mStickyTransform = 0;
@@ -156,7 +151,7 @@ status_t Surface::getDisplayRefreshCycleDuration(nsecs_t* outRefreshDuration) {
     ATRACE_CALL();
 
     DisplayStatInfo stats;
-    status_t result = composerService()->getDisplayStats(NULL, &stats);
+    status_t result = composerService()->getDisplayStats(nullptr, &stats);
     if (result != NO_ERROR) {
         return result;
     }
@@ -329,7 +324,7 @@ status_t Surface::getWideColorSupport(bool* supported) {
 
     sp<IBinder> display(
         composerService()->getBuiltInDisplay(ISurfaceComposer::eDisplayIdMain));
-    Vector<ColorMode> colorModes;
+    Vector<android_color_mode_t> colorModes;
     status_t err =
         composerService()->getDisplayColorModes(display, &colorModes);
 
@@ -341,11 +336,11 @@ status_t Surface::getWideColorSupport(bool* supported) {
                 &ISurfaceFlingerConfigs::hasWideColorDisplay>(false);
 
     *supported = false;
-    for (ColorMode colorMode : colorModes) {
+    for (android_color_mode_t colorMode : colorModes) {
         switch (colorMode) {
-            case ColorMode::DISPLAY_P3:
-            case ColorMode::ADOBE_RGB:
-            case ColorMode::DCI_P3:
+            case HAL_COLOR_MODE_DISPLAY_P3:
+            case HAL_COLOR_MODE_ADOBE_RGB:
+            case HAL_COLOR_MODE_DCI_P3:
                 if (wideColorBoardConfig) {
                     *supported = true;
                 }
@@ -477,7 +472,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
     uint32_t reqWidth;
     uint32_t reqHeight;
     PixelFormat reqFormat;
-    uint64_t reqUsage;
+    uint32_t reqUsage;
     bool enableFrameTimestamps;
 
     {
@@ -497,7 +492,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
         if (mSharedBufferMode && mAutoRefresh && mSharedBufferSlot !=
                 BufferItem::INVALID_BUFFER_SLOT) {
             sp<GraphicBuffer>& gbuf(mSlots[mSharedBufferSlot].buffer);
-            if (gbuf != NULL) {
+            if (gbuf != nullptr) {
                 *buffer = gbuf.get();
                 *fenceFd = -1;
                 return OK;
@@ -518,8 +513,8 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
 
     if (result < 0) {
         ALOGV("dequeueBuffer: IGraphicBufferProducer::dequeueBuffer"
-                "(%d, %d, %d, %#" PRIx64 ") failed: %d",
-                reqWidth, reqHeight, reqFormat, reqUsage, result);
+                "(%d, %d, %d, %d) failed: %d", reqWidth, reqHeight, reqFormat,
+                reqUsage, result);
         return result;
     }
 
@@ -537,7 +532,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
     sp<GraphicBuffer>& gbuf(mSlots[buf].buffer);
 
     // this should never happen
-    ALOGE_IF(fence == NULL, "Surface::dequeueBuffer: received null Fence! buf=%d", buf);
+    ALOGE_IF(fence == nullptr, "Surface::dequeueBuffer: received null Fence! buf=%d", buf);
 
     if (result & IGraphicBufferProducer::RELEASE_ALL_BUFFERS) {
         freeAllBuffers();
@@ -615,7 +610,7 @@ int Surface::cancelBuffer(android_native_buffer_t* buffer,
 int Surface::getSlotFromBufferLocked(
         android_native_buffer_t* buffer) const {
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (mSlots[i].buffer != NULL &&
+        if (mSlots[i].buffer != nullptr &&
                 mSlots[i].buffer->handle == buffer->handle) {
             return i;
         }
@@ -667,12 +662,8 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
     sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : Fence::NO_FENCE);
     IGraphicBufferProducer::QueueBufferOutput output;
     IGraphicBufferProducer::QueueBufferInput input(timestamp, isAutoTimestamp,
-            static_cast<android_dataspace>(mDataSpace), crop, mScalingMode,
-            mTransform ^ mStickyTransform, fence, mStickyTransform,
-            mEnableFrameTimestamps);
-
-    // we should send HDR metadata as needed if this becomes a bottleneck
-    input.setHdrMetadata(mHdrMetadata);
+            mDataSpace, crop, mScalingMode, mTransform ^ mStickyTransform,
+            fence, mStickyTransform, mEnableFrameTimestamps);
 
     if (mConnectedToCpu || mDirtyRegion.bounds() == Rect::INVALID_RECT) {
         input.setSurfaceDamage(Region::INVALID_REGION);
@@ -885,10 +876,6 @@ int Surface::query(int what, int* value) const {
                 *value = mGraphicBufferProducer != nullptr ? 1 : 0;
                 return NO_ERROR;
             }
-            case NATIVE_WINDOW_DATASPACE: {
-                *value = static_cast<int>(mDataSpace);
-                return NO_ERROR;
-            }
         }
     }
     return mGraphicBufferProducer->query(what, value);
@@ -955,12 +942,6 @@ int Surface::perform(int operation, va_list args)
     case NATIVE_WINDOW_SET_BUFFERS_DATASPACE:
         res = dispatchSetBuffersDataSpace(args);
         break;
-    case NATIVE_WINDOW_SET_BUFFERS_SMPTE2086_METADATA:
-        res = dispatchSetBuffersSmpte2086Metadata(args);
-        break;
-    case NATIVE_WINDOW_SET_BUFFERS_CTA861_3_METADATA:
-        res = dispatchSetBuffersCta8613Metadata(args);
-        break;
     case NATIVE_WINDOW_SET_SURFACE_DAMAGE:
         res = dispatchSetSurfaceDamage(args);
         break;
@@ -991,9 +972,6 @@ int Surface::perform(int operation, va_list args)
     case NATIVE_WINDOW_GET_HDR_SUPPORT:
         res = dispatchGetHdrSupport(args);
         break;
-    case NATIVE_WINDOW_SET_USAGE64:
-        res = dispatchSetUsage64(args);
-        break;
     case NATIVE_WINDOW_GET_CONSUMER_USAGE64:
         res = dispatchGetConsumerUsage64(args);
         break;
@@ -1015,13 +993,8 @@ int Surface::dispatchDisconnect(va_list args) {
 }
 
 int Surface::dispatchSetUsage(va_list args) {
-    uint64_t usage = va_arg(args, uint32_t);
-    return setUsage(usage);
-}
-
-int Surface::dispatchSetUsage64(va_list args) {
-    uint64_t usage = va_arg(args, uint64_t);
-    return setUsage(usage);
+    int usage = va_arg(args, int);
+    return setUsage(static_cast<uint32_t>(usage));
 }
 
 int Surface::dispatchSetCrop(va_list args) {
@@ -1100,20 +1073,9 @@ int Surface::dispatchSetSidebandStream(va_list args) {
 }
 
 int Surface::dispatchSetBuffersDataSpace(va_list args) {
-    Dataspace dataspace = static_cast<Dataspace>(va_arg(args, int));
+    android_dataspace dataspace =
+            static_cast<android_dataspace>(va_arg(args, int));
     return setBuffersDataSpace(dataspace);
-}
-
-int Surface::dispatchSetBuffersSmpte2086Metadata(va_list args) {
-    const android_smpte2086_metadata* metadata =
-        va_arg(args, const android_smpte2086_metadata*);
-    return setBuffersSmpte2086Metadata(metadata);
-}
-
-int Surface::dispatchSetBuffersCta8613Metadata(va_list args) {
-    const android_cta861_3_metadata* metadata =
-        va_arg(args, const android_cta861_3_metadata*);
-    return setBuffersCta8613Metadata(metadata);
 }
 
 int Surface::dispatchSetSurfaceDamage(va_list args) {
@@ -1187,7 +1149,7 @@ int Surface::dispatchGetHdrSupport(va_list args) {
 }
 
 int Surface::dispatchGetConsumerUsage64(va_list args) {
-    uint64_t* usage = va_arg(args, uint64_t*);
+    uint32_t* usage = va_arg(args, uint32_t*);
     return getConsumerUsage(usage);
 }
 
@@ -1264,7 +1226,7 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
     ATRACE_CALL();
     ALOGV("Surface::detachNextBuffer");
 
-    if (outBuffer == NULL || outFence == NULL) {
+    if (outBuffer == nullptr || outFence == nullptr) {
         return BAD_VALUE;
     }
 
@@ -1273,8 +1235,8 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
         mRemovedBuffers.clear();
     }
 
-    sp<GraphicBuffer> buffer(NULL);
-    sp<Fence> fence(NULL);
+    sp<GraphicBuffer> buffer(nullptr);
+    sp<Fence> fence(nullptr);
     status_t result = mGraphicBufferProducer->detachNextBuffer(
             &buffer, &fence);
     if (result != NO_ERROR) {
@@ -1282,19 +1244,19 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
     }
 
     *outBuffer = buffer;
-    if (fence != NULL && fence->isValid()) {
+    if (fence != nullptr && fence->isValid()) {
         *outFence = fence;
     } else {
         *outFence = Fence::NO_FENCE;
     }
 
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (mSlots[i].buffer != NULL &&
+        if (mSlots[i].buffer != nullptr &&
                 mSlots[i].buffer->getId() == buffer->getId()) {
             if (mReportRemovedBuffers) {
                 mRemovedBuffers.push_back(mSlots[i].buffer);
             }
-            mSlots[i].buffer = NULL;
+            mSlots[i].buffer = nullptr;
         }
     }
 
@@ -1315,7 +1277,8 @@ int Surface::attachBuffer(ANativeWindowBuffer* buffer)
     uint32_t priorGeneration = graphicBuffer->mGenerationNumber;
     graphicBuffer->mGenerationNumber = mGenerationNumber;
     int32_t attachedSlot = -1;
-    status_t result = mGraphicBufferProducer->attachBuffer(&attachedSlot, graphicBuffer);
+    status_t result = mGraphicBufferProducer->attachBuffer(
+            &attachedSlot, graphicBuffer);
     if (result != NO_ERROR) {
         ALOGE("attachBuffer: IGraphicBufferProducer call failed (%d)", result);
         graphicBuffer->mGenerationNumber = priorGeneration;
@@ -1329,7 +1292,7 @@ int Surface::attachBuffer(ANativeWindowBuffer* buffer)
     return NO_ERROR;
 }
 
-int Surface::setUsage(uint64_t reqUsage)
+int Surface::setUsage(uint32_t reqUsage)
 {
     ALOGV("Surface::setUsage");
     Mutex::Autolock lock(mMutex);
@@ -1345,7 +1308,7 @@ int Surface::setCrop(Rect const* rect)
     ATRACE_CALL();
 
     Rect realRect(Rect::EMPTY_RECT);
-    if (rect == NULL || rect->isEmpty()) {
+    if (rect == nullptr || rect->isEmpty()) {
         realRect.clear();
     } else {
         realRect = *rect;
@@ -1532,7 +1495,7 @@ int Surface::setBuffersTimestamp(int64_t timestamp)
     return NO_ERROR;
 }
 
-int Surface::setBuffersDataSpace(Dataspace dataSpace)
+int Surface::setBuffersDataSpace(android_dataspace dataSpace)
 {
     ALOGV("Surface::setBuffersDataSpace");
     Mutex::Autolock lock(mMutex);
@@ -1540,39 +1503,9 @@ int Surface::setBuffersDataSpace(Dataspace dataSpace)
     return NO_ERROR;
 }
 
-int Surface::setBuffersSmpte2086Metadata(const android_smpte2086_metadata* metadata) {
-    ALOGV("Surface::setBuffersSmpte2086Metadata");
-    Mutex::Autolock lock(mMutex);
-    if (metadata) {
-        mHdrMetadata.smpte2086 = *metadata;
-        mHdrMetadata.validTypes |= HdrMetadata::SMPTE2086;
-    } else {
-        mHdrMetadata.validTypes &= ~HdrMetadata::SMPTE2086;
-    }
-    return NO_ERROR;
-}
-
-int Surface::setBuffersCta8613Metadata(const android_cta861_3_metadata* metadata) {
-    ALOGV("Surface::setBuffersCta8613Metadata");
-    Mutex::Autolock lock(mMutex);
-    if (metadata) {
-        mHdrMetadata.cta8613 = *metadata;
-        mHdrMetadata.validTypes |= HdrMetadata::CTA861_3;
-    } else {
-        mHdrMetadata.validTypes &= ~HdrMetadata::CTA861_3;
-    }
-    return NO_ERROR;
-}
-
-Dataspace Surface::getBuffersDataSpace() {
-    ALOGV("Surface::getBuffersDataSpace");
-    Mutex::Autolock lock(mMutex);
-    return mDataSpace;
-}
-
 void Surface::freeAllBuffers() {
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        mSlots[i].buffer = 0;
+        mSlots[i].buffer = nullptr;
     }
 }
 
@@ -1612,12 +1545,12 @@ static status_t copyBlt(
     // src and dst with, height and format must be identical. no verification
     // is done here.
     status_t err;
-    uint8_t* src_bits = NULL;
+    uint8_t* src_bits = nullptr;
     err = src->lock(GRALLOC_USAGE_SW_READ_OFTEN, reg.bounds(),
             reinterpret_cast<void**>(&src_bits));
     ALOGE_IF(err, "error locking src buffer %s", strerror(-err));
 
-    uint8_t* dst_bits = NULL;
+    uint8_t* dst_bits = nullptr;
     err = dst->lockAsync(GRALLOC_USAGE_SW_WRITE_OFTEN, reg.bounds(),
             reinterpret_cast<void**>(&dst_bits), *dstFenceFd);
     ALOGE_IF(err, "error locking dst buffer %s", strerror(-err));
@@ -1665,7 +1598,7 @@ static status_t copyBlt(
 status_t Surface::lock(
         ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds)
 {
-    if (mLockedBuffer != 0) {
+    if (mLockedBuffer != nullptr) {
         ALOGE("Surface::lock failed, already locked");
         return INVALID_OPERATION;
     }
@@ -1697,7 +1630,7 @@ status_t Surface::lock(
 
         // figure out if we can copy the frontbuffer back
         const sp<GraphicBuffer>& frontBuffer(mPostedBuffer);
-        const bool canCopyBack = (frontBuffer != 0 &&
+        const bool canCopyBack = (frontBuffer != nullptr &&
                 backBuffer->width  == frontBuffer->width &&
                 backBuffer->height == frontBuffer->height &&
                 backBuffer->format == frontBuffer->format);
@@ -1759,7 +1692,7 @@ status_t Surface::lock(
 
 status_t Surface::unlockAndPost()
 {
-    if (mLockedBuffer == 0) {
+    if (mLockedBuffer == nullptr) {
         ALOGE("Surface::unlockAndPost failed, no locked buffer");
         return INVALID_OPERATION;
     }
@@ -1773,7 +1706,7 @@ status_t Surface::unlockAndPost()
             mLockedBuffer->handle, strerror(-err));
 
     mPostedBuffer = mLockedBuffer;
-    mLockedBuffer = 0;
+    mLockedBuffer = nullptr;
     return err;
 }
 
@@ -1790,7 +1723,7 @@ status_t Surface::getUniqueId(uint64_t* outId) const {
     return mGraphicBufferProducer->getUniqueId(outId);
 }
 
-int Surface::getConsumerUsage(uint64_t* outUsage) const {
+int Surface::getConsumerUsage(uint32_t* outUsage) const {
     Mutex::Autolock lock(mMutex);
     return mGraphicBufferProducer->getConsumerUsage(outUsage);
 }
@@ -1810,27 +1743,6 @@ status_t Surface::getAndFlushRemovedBuffers(std::vector<sp<GraphicBuffer>>* out)
     *out = mRemovedBuffers;
     mRemovedBuffers.clear();
     return OK;
-}
-
-status_t Surface::attachAndQueueBuffer(Surface* surface, sp<GraphicBuffer> buffer) {
-    if (buffer == nullptr) {
-        return BAD_VALUE;
-    }
-    int err = static_cast<ANativeWindow*>(surface)->perform(surface, NATIVE_WINDOW_API_CONNECT,
-                                                            NATIVE_WINDOW_API_CPU);
-    if (err != OK) {
-        return err;
-    }
-    err = surface->attachBuffer(buffer->getNativeBuffer());
-    if (err != OK) {
-        return err;
-    }
-    err = static_cast<ANativeWindow*>(surface)->queueBuffer(surface, buffer->getNativeBuffer(), -1);
-    if (err != OK) {
-        return err;
-    }
-    err = surface->disconnect(NATIVE_WINDOW_API_CPU);
-    return err;
 }
 
 }; // namespace android

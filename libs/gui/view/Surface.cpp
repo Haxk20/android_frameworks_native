@@ -45,7 +45,10 @@ status_t Surface::writeToParcel(Parcel* parcel, bool nameAlreadyWritten) const {
         if (res != OK) return res;
     }
 
-    return IGraphicBufferProducer::exportToParcel(graphicBufferProducer, parcel);
+    res = parcel->writeStrongBinder(
+            IGraphicBufferProducer::asBinder(graphicBufferProducer));
+
+    return res;
 }
 
 status_t Surface::readFromParcel(const Parcel* parcel) {
@@ -67,7 +70,16 @@ status_t Surface::readFromParcel(const Parcel* parcel, bool nameAlreadyRead) {
         }
     }
 
-    graphicBufferProducer = IGraphicBufferProducer::createFromParcel(parcel);
+    sp<IBinder> binder;
+
+    res = parcel->readNullableStrongBinder(&binder);
+    if (res != OK) {
+        ALOGE("%s: Can't read strong binder", __FUNCTION__);
+        return res;
+    }
+
+    graphicBufferProducer = interface_cast<IGraphicBufferProducer>(binder);
+
     return OK;
 }
 

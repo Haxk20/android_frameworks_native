@@ -628,6 +628,7 @@ FrameEventHistoryDelta& FrameEventHistoryDelta::operator=(
         ALOGE("FrameEventHistoryDelta assign clobbering history.");
     }
     mDeltas = std::move(src.mDeltas);
+    ALOGE_IF(src.mDeltas.empty(), "Source mDeltas not empty.");
     return *this;
 }
 

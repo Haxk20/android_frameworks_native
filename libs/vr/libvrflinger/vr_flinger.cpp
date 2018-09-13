@@ -29,10 +29,9 @@ namespace android {
 namespace dvr {
 
 std::unique_ptr<VrFlinger> VrFlinger::Create(
-    Hwc2::Composer* hidl, hwc2_display_t primary_display_id,
-    RequestDisplayCallback request_display_callback) {
+    Hwc2::Composer* hidl, RequestDisplayCallback request_display_callback) {
   std::unique_ptr<VrFlinger> vr_flinger(new VrFlinger);
-  if (vr_flinger->Init(hidl, primary_display_id, request_display_callback))
+  if (vr_flinger->Init(hidl, request_display_callback))
     return vr_flinger;
   else
     return nullptr;
@@ -57,7 +56,6 @@ VrFlinger::~VrFlinger() {
 }
 
 bool VrFlinger::Init(Hwc2::Composer* hidl,
-                     hwc2_display_t primary_display_id,
                      RequestDisplayCallback request_display_callback) {
   if (!hidl || !request_display_callback)
     return false;
@@ -76,8 +74,8 @@ bool VrFlinger::Init(Hwc2::Composer* hidl,
   dispatcher_ = android::pdx::ServiceDispatcher::Create();
   CHECK_ERROR(!dispatcher_, error, "Failed to create service dispatcher.");
 
-  display_service_ = android::dvr::DisplayService::Create(
-      hidl, primary_display_id, request_display_callback);
+  display_service_ =
+      android::dvr::DisplayService::Create(hidl, request_display_callback);
   CHECK_ERROR(!display_service_, error, "Failed to create display service.");
   dispatcher_->AddService(display_service_);
 
@@ -93,7 +91,7 @@ bool VrFlinger::Init(Hwc2::Composer* hidl,
       std::bind(&android::dvr::VSyncService::VSyncEvent,
                 std::static_pointer_cast<android::dvr::VSyncService>(service),
                 std::placeholders::_1, std::placeholders::_2,
-                std::placeholders::_3));
+                std::placeholders::_3, std::placeholders::_4));
 
   dispatcher_thread_ = std::thread([this]() {
     prctl(PR_SET_NAME, reinterpret_cast<unsigned long>("VrDispatch"), 0, 0, 0);
@@ -115,7 +113,6 @@ error:
 }
 
 void VrFlinger::OnBootFinished() {
-  display_service_->OnBootFinished();
   sp<IVrManager> vr_manager = interface_cast<IVrManager>(
       defaultServiceManager()->checkService(String16("vrmanager")));
   if (vr_manager.get()) {

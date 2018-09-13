@@ -14,7 +14,7 @@
 
 sourceFiles = [
     "buffer_hub_queue_client.cpp",
-    "buffer_hub_queue_parcelable.cpp",
+    "buffer_hub_queue_producer.cpp",
 ]
 
 includeFiles = [
@@ -23,6 +23,8 @@ includeFiles = [
 
 staticLibraries = [
     "libbufferhub",
+    "libdvrcommon",
+    "libpdx_default_transport",
 ]
 
 sharedLibraries = [
@@ -33,7 +35,7 @@ sharedLibraries = [
     "liblog",
     "libui",
     "libutils",
-    "libpdx_default_transport",
+    "libgui",
 ]
 
 headerLibraries = [
@@ -41,7 +43,7 @@ headerLibraries = [
     "libnativebase_headers",
 ]
 
-cc_library_shared {
+cc_library {
     name: "libbufferhubqueue",
     cflags: [
         "-DLOG_TAG=\"libbufferhubqueue\"",
@@ -61,4 +63,4 @@ cc_library_shared {
     header_libs: headerLibraries,
 }
 
-subdirs = ["benchmarks", "tests"]
+subdirs = ["tests"]

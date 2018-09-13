@@ -22,6 +22,7 @@ sourceFiles := \
 
 staticLibraries := \
 	libperformance \
+	libpdx_default_transport \
 	libvr_manager
 
 sharedLibraries := \
@@ -29,8 +30,7 @@ sharedLibraries := \
 	libbase \
 	libcutils \
 	liblog \
-	libutils \
-	libpdx_default_transport \
+	libutils
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := $(sourceFiles)

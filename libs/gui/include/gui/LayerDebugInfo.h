@@ -22,7 +22,6 @@
 #include <ui/Region.h>
 
 #include <string>
-#include <math/vec4.h>
 
 namespace android {
 
@@ -53,7 +52,7 @@ public:
     int32_t mHeight = -1;
     Rect mCrop = Rect::INVALID_RECT;
     Rect mFinalCrop = Rect::INVALID_RECT;
-    half4 mColor = half4(1.0_hf, 1.0_hf, 1.0_hf, 0.0_hf);
+    float mAlpha = 0.f;
     uint32_t mFlags = 0;
     PixelFormat mPixelFormat = PIXEL_FORMAT_NONE;
     android_dataspace mDataSpace = HAL_DATASPACE_UNKNOWN;

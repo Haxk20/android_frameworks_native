@@ -52,10 +52,14 @@ class BufferItemConsumer: public ConsumerBase
     // controlledByApp tells whether this consumer is controlled by the
     // application.
     BufferItemConsumer(const sp<IGraphicBufferConsumer>& consumer,
-            uint64_t consumerUsage, int bufferCount = DEFAULT_MAX_BUFFERS,
+            uint32_t consumerUsage, int bufferCount = DEFAULT_MAX_BUFFERS,
             bool controlledByApp = false);
 
     ~BufferItemConsumer() override;
+
+    // set the name of the BufferItemConsumer that will be used to identify it in
+    // log messages.
+    void setName(const String8& name);
 
     // setBufferFreedListener sets the listener object that will be notified
     // when an old buffer is being freed.

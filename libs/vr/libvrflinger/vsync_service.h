@@ -63,10 +63,9 @@ class VSyncService : public pdx::ServiceBase<VSyncService> {
                       const std::shared_ptr<pdx::Channel>& channel) override;
 
   // Called by the hardware composer HAL, or similar, whenever a vsync event
-  // occurs on the primary display. |compositor_time_ns| is the number of ns
-  // before the next vsync when the compositor will preempt the GPU to do EDS
-  // and lens warp.
-  void VSyncEvent(int64_t timestamp_ns, int64_t compositor_time_ns,
+  // occurs. |compositor_time_ns| is the number of ns before the next vsync when
+  // the compositor will preempt the GPU to do EDS and lens warp.
+  void VSyncEvent(int display, int64_t timestamp_ns, int64_t compositor_time_ns,
                   uint32_t vsync_count);
 
  private:

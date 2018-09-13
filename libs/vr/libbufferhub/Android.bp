@@ -15,7 +15,6 @@
 sourceFiles = [
     "buffer_hub_client.cpp",
     "buffer_hub_rpc.cpp",
-    "detached_buffer.cpp",
     "ion_buffer.cpp",
 ]
 
@@ -23,16 +22,19 @@ localIncludeFiles = [
     "include",
 ]
 
+staticLibraries = [
+    "libdvrcommon",
+    "libpdx_default_transport",
+]
+
 sharedLibraries = [
     "libbase",
-    "libbinder",
     "libcutils",
     "libhardware",
     "liblog",
     "libui",
     "libutils",
-    "libnativewindow",
-    "libpdx_default_transport",
+    "libnativewindow"
 ]
 
 headerLibraries = [
@@ -50,6 +52,7 @@ cc_library {
         "-Werror",
     ],
     export_include_dirs: localIncludeFiles,
+    static_libs: staticLibraries,
     shared_libs: sharedLibraries,
     header_libs: headerLibraries,
     name: "libbufferhub",
@@ -59,11 +62,9 @@ cc_library {
 }
 
 cc_test {
-    tags: ["optional"],
-    srcs: ["buffer_hub-test.cpp"],
-    static_libs: ["libbufferhub"],
+    srcs: ["bufferhub_tests.cpp"],
+    static_libs: ["libbufferhub"] + staticLibraries,
     shared_libs: sharedLibraries,
     header_libs: headerLibraries,
-    name: "buffer_hub-test",
+    name: "bufferhub_tests",
 }
-

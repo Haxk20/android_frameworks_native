@@ -22,8 +22,6 @@
 
 namespace android {
 
-using Transaction = SurfaceComposerClient::Transaction;
-
 static int abs(int value) {
     return value > 0 ? value : -value;
 }
@@ -70,10 +68,10 @@ void GLTest::SetUp() {
         ASSERT_TRUE(mSurfaceControl != NULL);
         ASSERT_TRUE(mSurfaceControl->isValid());
 
-        Transaction t;
-        ASSERT_EQ(NO_ERROR, t.setLayer(mSurfaceControl, 0x7FFFFFFF)
-                .show(mSurfaceControl)
-                .apply());
+        SurfaceComposerClient::openGlobalTransaction();
+        ASSERT_EQ(NO_ERROR, mSurfaceControl->setLayer(0x7FFFFFFF));
+        ASSERT_EQ(NO_ERROR, mSurfaceControl->show());
+        SurfaceComposerClient::closeGlobalTransaction();
 
         sp<ANativeWindow> window = mSurfaceControl->getSurface();
         mEglSurface = createWindowSurface(mEglDisplay, mGlConfig, window);

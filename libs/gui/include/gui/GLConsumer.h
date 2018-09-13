@@ -20,6 +20,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
+#include <gui/BufferQueue.h>
 #include <gui/BufferQueueDefs.h>
 #include <gui/ConsumerBase.h>
 
@@ -29,6 +30,10 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
+
+#ifdef STE_HARDWARE
+#include <hardware/copybit.h>
+#endif
 
 namespace android {
 // ----------------------------------------------------------------------------
@@ -89,6 +94,11 @@ public:
     GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t texureTarget,
             bool useFenceSync, bool isControlledByApp);
 
+#ifdef STE_HARDWARE
+    // Method for closing copybit device while abandoning the surface 
+    virtual ~GLConsumer();
+#endif
+
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
     //
@@ -137,10 +147,6 @@ public:
     static void computeTransformMatrix(float outTransform[16],
             const sp<GraphicBuffer>& buf, const Rect& cropRect,
             uint32_t transform, bool filtering);
-
-    // Scale the crop down horizontally or vertically such that it has the
-    // same aspect ratio as the buffer does.
-    static Rect scaleDownCrop(const Rect& crop, uint32_t bufferWidth, uint32_t bufferHeight);
 
     // getTimestamp retrieves the timestamp associated with the texture image
     // set by the most recent call to updateTexImage.
@@ -201,9 +207,24 @@ public:
     // buffer is ready to be read from.
     std::shared_ptr<FenceTime> getCurrentFenceTime() const;
 
-    // setConsumerUsageBits overrides the ConsumerBase method to OR
-    // DEFAULT_USAGE_FLAGS to usage.
-    status_t setConsumerUsageBits(uint64_t usage);
+    // doGLFenceWait inserts a wait command into the OpenGL ES command stream
+    // to ensure that it is safe for future OpenGL ES commands to access the
+    // current texture buffer.
+    status_t doGLFenceWait() const;
+
+    // set the name of the GLConsumer that will be used to identify it in
+    // log messages.
+    void setName(const String8& name);
+
+    // These functions call the corresponding BufferQueue implementation
+    // so the refactoring can proceed smoothly
+    status_t setDefaultBufferFormat(PixelFormat defaultFormat);
+    status_t setDefaultBufferDataSpace(android_dataspace defaultDataSpace);
+    status_t setConsumerUsageBits(uint32_t usage);
+    status_t setTransformHint(uint32_t hint);
+    status_t setMaxAcquiredBufferCount(int maxAcquiredBuffers);
+
+    status_t convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf);
 
     // detachFromContext detaches the GLConsumer from the calling thread's
     // current OpenGL ES context.  This context must be the same as the context
@@ -253,10 +274,17 @@ protected:
             const sp<GraphicBuffer> graphicBuffer,
             EGLDisplay display, EGLSyncKHR eglFence) override;
 
+#ifdef STE_HARDWARE
+    // returns true if the slot still has the graphicBuffer in it.
+    virtual bool stillTracking(int slot, const sp<GraphicBuffer> graphicBuffer);
+#endif
+
     status_t releaseBufferLocked(int slot,
             const sp<GraphicBuffer> graphicBuffer, EGLSyncKHR eglFence) {
         return releaseBufferLocked(slot, graphicBuffer, mEglDisplay, eglFence);
     }
+
+    static bool isExternalFormat(PixelFormat format);
 
     struct PendingRelease {
         PendingRelease() : isPending(false), currentTexture(-1),
@@ -326,6 +354,11 @@ private:
         EGLImageKHR createImage(EGLDisplay dpy,
                 const sp<GraphicBuffer>& graphicBuffer, const Rect& crop);
 
+#ifdef STE_HARDWARE
+    // converts buffer to a suitable color format
+    status_t convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf);
+#endif
+
         // Disallow copying
         EglImage(const EglImage& rhs);
         void operator = (const EglImage& rhs);
@@ -375,7 +408,7 @@ private:
     // BufferQueue instance; these will be OR:d with any additional flags passed
     // from the GLConsumer user. In particular, GLConsumer will always
     // consume buffers as hardware textures.
-    static const uint64_t DEFAULT_USAGE_FLAGS = GraphicBuffer::USAGE_HW_TEXTURE;
+    static const uint32_t DEFAULT_USAGE_FLAGS = GraphicBuffer::USAGE_HW_TEXTURE;
 
     // mCurrentTextureImage is the EglImage/buffer of the current texture. It's
     // possible that this buffer is not associated with any buffer slot, so we
@@ -487,6 +520,18 @@ private:
     // that no buffer is bound to the texture. A call to setBufferCount will
     // reset mCurrentTexture to INVALID_BUFFER_SLOT.
     int mCurrentTexture;
+
+#ifdef STE_HARDWARE
+    // mBlitEngine is the handle to the copybit device which will be used in
+    // case color transform is needed before the EGL image is created.
+    copybit_device_t* mBlitEngine;
+
+    // mBlitSlots stores the buffers that have been allocated int the case
+    // of color transform. It is initialised to null pointer,s and gets
+    // filled in with the result of GLConsumer::updateAndReleaseLocked
+    sp<GraphicBuffer> mBlitSlots[BufferQueue::NUM_BLIT_BUFFER_SLOTS];
+    int mNextBlitSlot;
+#endif
 
     // mAttached indicates whether the ConsumerBase is currently attached to
     // an OpenGL ES context.  For legacy reasons, this is initialized to true,

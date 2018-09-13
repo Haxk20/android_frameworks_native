@@ -17,12 +17,10 @@
 #ifndef ANDROID_GUI_SURFACE_H
 #define ANDROID_GUI_SURFACE_H
 
-#include <gui/BufferQueueDefs.h>
-#include <gui/HdrMetadata.h>
 #include <gui/IGraphicBufferProducer.h>
+#include <gui/BufferQueueDefs.h>
 
 #include <ui/ANativeObjectBase.h>
-#include <ui/GraphicTypes.h>
 #include <ui/Region.h>
 
 #include <utils/Condition.h>
@@ -161,7 +159,7 @@ public:
     status_t getHdrSupport(bool* supported);
 
     status_t getUniqueId(uint64_t* outId) const;
-    status_t getConsumerUsage(uint64_t* outUsage) const;
+    status_t getConsumerUsage(uint32_t* outUsage) const;
 
     // Returns the CLOCK_MONOTONIC start time of the last dequeueBuffer call
     nsecs_t getLastDequeueStartTime() const;
@@ -210,14 +208,12 @@ private:
     int dispatchSetBuffersStickyTransform(va_list args);
     int dispatchSetBuffersTimestamp(va_list args);
     int dispatchSetCrop(va_list args);
+    int dispatchSetPostTransformCrop(va_list args);
     int dispatchSetUsage(va_list args);
-    int dispatchSetUsage64(va_list args);
     int dispatchLock(va_list args);
     int dispatchUnlockAndPost(va_list args);
     int dispatchSetSidebandStream(va_list args);
     int dispatchSetBuffersDataSpace(va_list args);
-    int dispatchSetBuffersSmpte2086Metadata(va_list args);
-    int dispatchSetBuffersCta8613Metadata(va_list args);
     int dispatchSetSurfaceDamage(va_list args);
     int dispatchSetSharedBufferMode(va_list args);
     int dispatchSetAutoRefresh(va_list args);
@@ -246,11 +242,9 @@ protected:
     virtual int setBuffersTransform(uint32_t transform);
     virtual int setBuffersStickyTransform(uint32_t transform);
     virtual int setBuffersTimestamp(int64_t timestamp);
-    virtual int setBuffersDataSpace(ui::Dataspace dataSpace);
-    virtual int setBuffersSmpte2086Metadata(const android_smpte2086_metadata* metadata);
-    virtual int setBuffersCta8613Metadata(const android_cta861_3_metadata* metadata);
+    virtual int setBuffersDataSpace(android_dataspace dataSpace);
     virtual int setCrop(Rect const* rect);
-    virtual int setUsage(uint64_t reqUsage);
+    virtual int setUsage(uint32_t reqUsage);
     virtual void setSurfaceDamage(android_native_rect_t* rects, size_t numRects);
 
 public:
@@ -286,10 +280,6 @@ public:
     // Surface later. The list of removed buffers will only be stored until the next dequeueBuffer,
     // detachNextBuffer, or attachBuffer call.
     status_t getAndFlushRemovedBuffers(std::vector<sp<GraphicBuffer>>* out);
-
-    ui::Dataspace getBuffersDataSpace();
-
-    static status_t attachAndQueueBuffer(Surface* surface, sp<GraphicBuffer> buffer);
 
 protected:
     enum { NUM_BUFFER_SLOTS = BufferQueueDefs::NUM_BUFFER_SLOTS };
@@ -333,7 +323,7 @@ protected:
 
     // mReqUsage is the set of buffer usage flags that will be requested
     // at the next deuque operation. It is initialized to 0.
-    uint64_t mReqUsage;
+    uint32_t mReqUsage;
 
     // mTimestamp is the timestamp that will be used for the next buffer queue
     // operation. It defaults to NATIVE_WINDOW_TIMESTAMP_AUTO, which means that
@@ -341,13 +331,9 @@ protected:
     int64_t mTimestamp;
 
     // mDataSpace is the buffer dataSpace that will be used for the next buffer
-    // queue operation. It defaults to Dataspace::UNKNOWN, which
+    // queue operation. It defaults to HAL_DATASPACE_UNKNOWN, which
     // means that the buffer contains some type of color data.
-    ui::Dataspace mDataSpace;
-
-    // mHdrMetadata is the HDR metadata that will be used for the next buffer
-    // queue operation.  There is no HDR metadata by default.
-    HdrMetadata mHdrMetadata;
+    android_dataspace mDataSpace;
 
     // mCrop is the crop rectangle that will be used for the next buffer
     // that gets queued. It is set by calling setCrop.

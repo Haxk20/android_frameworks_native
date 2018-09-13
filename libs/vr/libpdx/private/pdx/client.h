@@ -49,7 +49,6 @@ class Client {
 
   // Returns a reference to IPC channel handle.
   LocalChannelHandle& GetChannelHandle();
-  const LocalChannelHandle& GetChannelHandle() const;
 
  protected:
   friend Transaction;

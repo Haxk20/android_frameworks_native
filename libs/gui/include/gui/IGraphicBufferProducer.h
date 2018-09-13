@@ -31,7 +31,6 @@
 #include <ui/Region.h>
 
 #include <gui/FrameTimestamps.h>
-#include <gui/HdrMetadata.h>
 
 #include <hidl/HybridInterface.h>
 #include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
@@ -71,14 +70,6 @@ public:
         // A flag returned by dequeueBuffer when all mirrored slots should be
         // released by the client. This flag should always be processed first.
         RELEASE_ALL_BUFFERS       = 0x2,
-    };
-
-    enum {
-        // A parcelable magic indicates using Binder BufferQueue as transport
-        // backend.
-        USE_BUFFER_QUEUE = 0x62717565, // 'bque'
-        // A parcelable magic indicates using BufferHub as transport backend.
-        USE_BUFFER_HUB = 0x62687562, // 'bhub'
     };
 
     // requestBuffer requests a new buffer for the given index. The server (i.e.
@@ -204,7 +195,7 @@ public:
     // All other negative values are an unknown error returned downstream
     // from the graphics allocator (typically errno).
     virtual status_t dequeueBuffer(int* slot, sp<Fence>* fence, uint32_t w, uint32_t h,
-                                   PixelFormat format, uint64_t usage, uint64_t* outBufferAge,
+                                   PixelFormat format, uint32_t usage, uint64_t* outBufferAge,
                                    FrameEventHistoryDelta* outTimestamps) = 0;
 
     // detachBuffer attempts to remove all ownership of the buffer in the given
@@ -306,9 +297,13 @@ public:
     //              * the slot was not in the dequeued state
     //              * the slot was enqueued without requesting a buffer
     //              * crop rect is out of bounds of the buffer dimensions
-
+#ifdef STE_HARDWARE
+    struct QueueBufferInput : public Flattenable {
+        friend class Flattenable;
+#else
     struct QueueBufferInput : public Flattenable<QueueBufferInput> {
         friend class Flattenable<QueueBufferInput>;
+#endif
         explicit inline QueueBufferInput(const Parcel& parcel);
 
         // timestamp - a monotonically increasing value in nanoseconds
@@ -363,9 +358,6 @@ public:
         const Region& getSurfaceDamage() const { return surfaceDamage; }
         void setSurfaceDamage(const Region& damage) { surfaceDamage = damage; }
 
-        const HdrMetadata& getHdrMetadata() const { return hdrMetadata; }
-        void setHdrMetadata(const HdrMetadata& metadata) { hdrMetadata = metadata; }
-
     private:
         int64_t timestamp{0};
         int isAutoTimestamp{0};
@@ -377,10 +369,13 @@ public:
         sp<Fence> fence;
         Region surfaceDamage;
         bool getFrameTimestamps{false};
-        HdrMetadata hdrMetadata;
     };
 
+#ifdef STE_HARDWARE
+    struct QueueBufferOutput : public Flattenable {
+#else
     struct QueueBufferOutput : public Flattenable<QueueBufferOutput> {
+#endif
         QueueBufferOutput() = default;
 
         // Moveable.
@@ -530,7 +525,7 @@ public:
     // dequeueBuffer. If there are already the maximum number of buffers
     // allocated, this function has no effect.
     virtual void allocateBuffers(uint32_t width, uint32_t height,
-            PixelFormat format, uint64_t usage) = 0;
+            PixelFormat format, uint32_t usage) = 0;
 
     // Sets whether dequeueBuffer is allowed to allocate new buffers.
     //
@@ -611,25 +606,7 @@ public:
     // full 64-bit usage flags, rather than the truncated 32-bit usage flags
     // returned by querying the now deprecated
     // NATIVE_WINDOW_CONSUMER_USAGE_BITS attribute.
-    virtual status_t getConsumerUsage(uint64_t* outUsage) const = 0;
-
-    // Static method exports any IGraphicBufferProducer object to a parcel. It
-    // handles null producer as well.
-    static status_t exportToParcel(const sp<IGraphicBufferProducer>& producer,
-                                   Parcel* parcel);
-
-    // Factory method that creates a new IBGP instance from the parcel.
-    static sp<IGraphicBufferProducer> createFromParcel(const Parcel* parcel);
-
-protected:
-    // Exports the current producer as a binder parcelable object. Note that the
-    // producer must be disconnected to be exportable. After successful export,
-    // the producer queue can no longer be connected again. Returns NO_ERROR
-    // when the export is successful and writes an implementation defined
-    // parcelable object into the parcel. For traditional Android BufferQueue,
-    // it writes a strong binder object; for BufferHub, it writes a
-    // ProducerQueueParcelable object.
-    virtual status_t exportToParcel(Parcel* parcel);
+    virtual status_t getConsumerUsage(uint32_t* outUsage) const = 0;
 };
 
 // ----------------------------------------------------------------------------
