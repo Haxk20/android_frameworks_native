@@ -82,17 +82,17 @@ void FrameTracker::advanceFrame() {
     mFrameRecords[mOffset].frameReadyTime = INT64_MAX;
     mFrameRecords[mOffset].actualPresentTime = INT64_MAX;
 
-    if (mFrameRecords[mOffset].frameReadyFence != nullptr) {
+    if (mFrameRecords[mOffset].frameReadyFence != NULL) {
         // We're clobbering an unsignaled fence, so we need to decrement the
         // fence count.
-        mFrameRecords[mOffset].frameReadyFence = nullptr;
+        mFrameRecords[mOffset].frameReadyFence = NULL;
         mNumFences--;
     }
 
-    if (mFrameRecords[mOffset].actualPresentFence != nullptr) {
+    if (mFrameRecords[mOffset].actualPresentFence != NULL) {
         // We're clobbering an unsignaled fence, so we need to decrement the
         // fence count.
-        mFrameRecords[mOffset].actualPresentFence = nullptr;
+        mFrameRecords[mOffset].actualPresentFence = NULL;
         mNumFences--;
     }
 }
@@ -153,10 +153,10 @@ void FrameTracker::processFencesLocked() const {
         bool updated = false;
 
         const std::shared_ptr<FenceTime>& rfence = records[idx].frameReadyFence;
-        if (rfence != nullptr) {
+        if (rfence != NULL) {
             records[idx].frameReadyTime = rfence->getSignalTime();
             if (records[idx].frameReadyTime < INT64_MAX) {
-                records[idx].frameReadyFence = nullptr;
+                records[idx].frameReadyFence = NULL;
                 numFences--;
                 updated = true;
             }
@@ -164,10 +164,10 @@ void FrameTracker::processFencesLocked() const {
 
         const std::shared_ptr<FenceTime>& pfence =
                 records[idx].actualPresentFence;
-        if (pfence != nullptr) {
+        if (pfence != NULL) {
             records[idx].actualPresentTime = pfence->getSignalTime();
             if (records[idx].actualPresentTime < INT64_MAX) {
-                records[idx].actualPresentFence = nullptr;
+                records[idx].actualPresentFence = NULL;
                 numFences--;
                 updated = true;
             }

@@ -19,18 +19,12 @@
 
 namespace android {
 
-LayerVector::LayerVector(const StateSet stateSet) : mStateSet(stateSet) {}
+LayerVector::LayerVector() = default;
 
-LayerVector::LayerVector(const LayerVector& rhs, const StateSet stateSet)
-      : SortedVector<sp<Layer>>(rhs), mStateSet(stateSet) {}
+LayerVector::LayerVector(const LayerVector& rhs) : SortedVector<sp<Layer>>(rhs) {
+}
 
 LayerVector::~LayerVector() = default;
-
-// This operator override is needed to prevent mStateSet from getting copied over.
-LayerVector& LayerVector::operator=(const LayerVector& rhs) {
-    SortedVector::operator=(rhs);
-    return *this;
-}
 
 int LayerVector::do_compare(const void* lhs, const void* rhs) const
 {
@@ -38,18 +32,13 @@ int LayerVector::do_compare(const void* lhs, const void* rhs) const
     const auto& l = *reinterpret_cast<const sp<Layer>*>(lhs);
     const auto& r = *reinterpret_cast<const sp<Layer>*>(rhs);
 
-    const auto& lState =
-            (mStateSet == StateSet::Current) ? l->getCurrentState() : l->getDrawingState();
-    const auto& rState =
-            (mStateSet == StateSet::Current) ? r->getCurrentState() : r->getDrawingState();
-
-    uint32_t ls = lState.layerStack;
-    uint32_t rs = rState.layerStack;
+    uint32_t ls = l->getCurrentState().layerStack;
+    uint32_t rs = r->getCurrentState().layerStack;
     if (ls != rs)
         return (ls > rs) ? 1 : -1;
 
-    int32_t lz = lState.z;
-    int32_t rz = rState.z;
+    uint32_t lz = l->getCurrentState().z;
+    uint32_t rz = r->getCurrentState().z;
     if (lz != rz)
         return (lz > rz) ? 1 : -1;
 

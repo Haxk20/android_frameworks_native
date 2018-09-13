@@ -32,17 +32,15 @@ class Layer;
  */
 class LayerVector : public SortedVector<sp<Layer>> {
 public:
+    LayerVector();
+    LayerVector(const LayerVector& rhs);
+    ~LayerVector() override;
+
     enum class StateSet {
         Invalid,
         Current,
         Drawing,
     };
-
-    explicit LayerVector(const StateSet stateSet);
-    LayerVector(const LayerVector& rhs, const StateSet stateSet);
-    ~LayerVector() override;
-
-    LayerVector& operator=(const LayerVector& rhs);
 
     // Sorts layer by layer-stack, Z order, and finally creation order (sequence).
     int do_compare(const void* lhs, const void* rhs) const override;
@@ -50,9 +48,6 @@ public:
     using Visitor = std::function<void(Layer*)>;
     void traverseInReverseZOrder(StateSet stateSet, const Visitor& visitor) const;
     void traverseInZOrder(StateSet stateSet, const Visitor& visitor) const;
-
-private:
-    const StateSet mStateSet;
 };
 }
 

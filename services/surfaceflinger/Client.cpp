@@ -47,32 +47,18 @@ Client::Client(const sp<SurfaceFlinger>& flinger, const sp<Layer>& parentLayer)
 
 Client::~Client()
 {
-    // We need to post a message to remove our remaining layers rather than
-    // do so directly by acquiring the SurfaceFlinger lock. If we were to
-    // attempt to directly call the lock it becomes effectively impossible
-    // to use sp<Client> while holding the SF lock as descoping it could
-    // then trigger a dead-lock.
-
     const size_t count = mLayers.size();
     for (size_t i=0 ; i<count ; i++) {
         sp<Layer> l = mLayers.valueAt(i).promote();
-        if (l == nullptr) {
-            continue;
+        if (l != nullptr) {
+            mFlinger->removeLayer(l);
         }
-        mFlinger->postMessageAsync(new LambdaMessage([flinger = mFlinger, l]() {
-            flinger->removeLayer(l);
-        }));
     }
 }
 
-void Client::updateParent(const sp<Layer>& parentLayer) {
+void Client::setParentLayer(const sp<Layer>& parentLayer) {
     Mutex::Autolock _l(mLock);
-
-    // If we didn't ever have a parent, then we must instead be
-    // relying on permissions and we never need a parent.
-    if (mParentLayer != nullptr) {
-        mParentLayer = parentLayer;
-    }
+    mParentLayer = parentLayer;
 }
 
 sp<Layer> Client::getParentLayer(bool* outParentDied) const {
@@ -148,14 +134,13 @@ status_t Client::onTransact(
 status_t Client::createSurface(
         const String8& name,
         uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,
-        const sp<IBinder>& parentHandle, int32_t windowType, int32_t ownerUid,
+        const sp<IBinder>& parentHandle, uint32_t windowType, uint32_t ownerUid,
         sp<IBinder>* handle,
         sp<IGraphicBufferProducer>* gbp)
 {
     sp<Layer> parent = nullptr;
     if (parentHandle != nullptr) {
-        auto layerHandle = reinterpret_cast<Layer::Handle*>(parentHandle.get());
-        parent = layerHandle->owner.promote();
+        parent = getLayerUser(parentHandle);
         if (parent == nullptr) {
             return NAME_NOT_FOUND;
         }
@@ -185,13 +170,13 @@ status_t Client::createSurface(
         PixelFormat format;
         uint32_t flags;
         sp<Layer>* parent;
-        int32_t windowType;
-        int32_t ownerUid;
+        uint32_t windowType;
+        uint32_t ownerUid;
     public:
         MessageCreateLayer(SurfaceFlinger* flinger,
                 const String8& name, Client* client,
                 uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,
-                sp<IBinder>* handle, int32_t windowType, int32_t ownerUid,
+                sp<IBinder>* handle, uint32_t windowType, uint32_t ownerUid,
                 sp<IGraphicBufferProducer>* gbp,
                 sp<Layer>* parent)
             : flinger(flinger), client(client),
@@ -220,7 +205,7 @@ status_t Client::destroySurface(const sp<IBinder>& handle) {
 
 status_t Client::clearLayerFrameStats(const sp<IBinder>& handle) const {
     sp<Layer> layer = getLayerUser(handle);
-    if (layer == nullptr) {
+    if (layer == NULL) {
         return NAME_NOT_FOUND;
     }
     layer->clearFrameStats();
@@ -229,7 +214,7 @@ status_t Client::clearLayerFrameStats(const sp<IBinder>& handle) const {
 
 status_t Client::getLayerFrameStats(const sp<IBinder>& handle, FrameStats* outStats) const {
     sp<Layer> layer = getLayerUser(handle);
-    if (layer == nullptr) {
+    if (layer == NULL) {
         return NAME_NOT_FOUND;
     }
     layer->getFrameStats(outStats);

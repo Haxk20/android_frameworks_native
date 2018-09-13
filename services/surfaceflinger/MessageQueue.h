@@ -17,16 +17,16 @@
 #ifndef ANDROID_MESSAGE_QUEUE_H
 #define ANDROID_MESSAGE_QUEUE_H
 
-#include <errno.h>
 #include <stdint.h>
+#include <errno.h>
 #include <sys/types.h>
 
-#include <utils/Looper.h>
-#include <utils/Timers.h>
 #include <utils/threads.h>
+#include <utils/Timers.h>
+#include <utils/Looper.h>
 
-#include <gui/IDisplayEventConnection.h>
 #include <private/gui/BitTube.h>
+#include <gui/DisplayEventReceiver.h>
 
 #include "Barrier.h"
 
@@ -34,15 +34,17 @@
 
 namespace android {
 
+class IDisplayEventConnection;
 class EventThread;
 class SurfaceFlinger;
 
 // ---------------------------------------------------------------------------
 
-class MessageBase : public MessageHandler {
+class MessageBase : public MessageHandler
+{
 public:
     MessageBase();
-
+    
     // return true if message has a handler
     virtual bool handler() = 0;
 
@@ -76,34 +78,16 @@ private:
 // ---------------------------------------------------------------------------
 
 class MessageQueue {
-public:
-    enum {
-        INVALIDATE = 0,
-        REFRESH = 1,
-    };
-
-    virtual ~MessageQueue();
-
-    virtual void init(const sp<SurfaceFlinger>& flinger) = 0;
-    virtual void setEventThread(EventThread* events) = 0;
-    virtual void waitMessage() = 0;
-    virtual status_t postMessage(const sp<MessageBase>& message, nsecs_t reltime = 0) = 0;
-    virtual void invalidate() = 0;
-    virtual void refresh() = 0;
-};
-
-// ---------------------------------------------------------------------------
-
-namespace impl {
-
-class MessageQueue final : public android::MessageQueue {
     class Handler : public MessageHandler {
-        enum { eventMaskInvalidate = 0x1, eventMaskRefresh = 0x2, eventMaskTransaction = 0x4 };
+        enum {
+            eventMaskInvalidate     = 0x1,
+            eventMaskRefresh        = 0x2,
+            eventMaskTransaction    = 0x4
+        };
         MessageQueue& mQueue;
         int32_t mEventMask;
-
     public:
-        explicit Handler(MessageQueue& queue) : mQueue(queue), mEventMask(0) {}
+        explicit Handler(MessageQueue& queue) : mQueue(queue), mEventMask(0) { }
         virtual void handleMessage(const Message& message);
         void dispatchRefresh();
         void dispatchInvalidate();
@@ -113,31 +97,37 @@ class MessageQueue final : public android::MessageQueue {
 
     sp<SurfaceFlinger> mFlinger;
     sp<Looper> mLooper;
-    android::EventThread* mEventThread;
+    sp<EventThread> mEventThread;
     sp<IDisplayEventConnection> mEvents;
     gui::BitTube mEventTube;
     sp<Handler> mHandler;
+
 
     static int cb_eventReceiver(int fd, int events, void* data);
     int eventReceiver(int fd, int events);
 
 public:
-    ~MessageQueue() override = default;
-    void init(const sp<SurfaceFlinger>& flinger) override;
-    void setEventThread(android::EventThread* events) override;
+    enum {
+        INVALIDATE  = 0,
+        REFRESH     = 1,
+    };
 
-    void waitMessage() override;
-    status_t postMessage(const sp<MessageBase>& message, nsecs_t reltime = 0) override;
+    MessageQueue();
+    ~MessageQueue();
+    void init(const sp<SurfaceFlinger>& flinger);
+    void setEventThread(const sp<EventThread>& events);
+
+    void waitMessage();
+    status_t postMessage(const sp<MessageBase>& message, nsecs_t reltime=0);
 
     // sends INVALIDATE message at next VSYNC
-    void invalidate() override;
+    void invalidate();
     // sends REFRESH message at next VSYNC
-    void refresh() override;
+    void refresh();
 };
 
 // ---------------------------------------------------------------------------
 
-} // namespace impl
-} // namespace android
+}; // namespace android
 
 #endif /* ANDROID_MESSAGE_QUEUE_H */
