@@ -21,6 +21,8 @@
 #define GL_GLEXT_PROTOTYPES
 #define EGL_EGLEXT_PROTOTYPES
 
+#include <inttypes.h>
+
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
@@ -1224,7 +1226,7 @@ status_t GLConsumer::setDefaultBufferDataSpace(
     return mConsumer->setDefaultBufferDataSpace(defaultDataSpace);
 }
 
-status_t GLConsumer::setConsumerUsageBits(uint32_t usage) {
+status_t GLConsumer::setConsumerUsageBits(uint64_t usage) {
     Mutex::Autolock lock(mMutex);
     if (mAbandoned) {
         GLC_LOGE("setConsumerUsageBits: GLConsumer is abandoned!");
@@ -1383,9 +1385,9 @@ status_t GLConsumer::EglImage::createIfNeeded(EGLDisplay eglDisplay,
         mEglDisplay = EGL_NO_DISPLAY;
         mCropRect.makeInvalid();
         const sp<GraphicBuffer>& buffer = mGraphicBuffer;
-        ALOGE("Failed to create image. size=%ux%u st=%u fmt=%d",
+        ALOGE("Failed to create image. size=%ux%u st=%u usage=%#" PRIx64 " fmt=%d",
             buffer->getWidth(), buffer->getHeight(), buffer->getStride(),
-            buffer->getPixelFormat());
+            buffer->getUsage(), buffer->getPixelFormat());
         return UNKNOWN_ERROR;
     }
 

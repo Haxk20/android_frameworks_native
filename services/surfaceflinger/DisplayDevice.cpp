@@ -31,7 +31,7 @@
 #include <ui/DisplayInfo.h>
 #include <ui/PixelFormat.h>
 #ifdef STE_HARDWARE
-#include <ui/FramebufferNativeWindow.h>
+//#include <ui/FramebufferNativeWindow.h>
 #endif
 
 #include <gui/Surface.h>
@@ -119,13 +119,13 @@ DisplayDevice::DisplayDevice(
       mActiveConfig(0)
 {
     // clang-format on
-#ifdef STE_HARDWARE
+/*#ifdef STE_HARDWARE
     ANativeWindow* const window = new FramebufferNativeWindow();
-#else
+#else*/
     Surface* surface;
     mNativeWindow = surface = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
-#endif
+//#endif
 
 #ifdef USE_HWC2
     mActiveColorMode = HAL_COLOR_MODE_NATIVE;
@@ -450,7 +450,7 @@ android_color_mode_t DisplayDevice::getActiveColorMode() const {
 }
 
 void DisplayDevice::setCompositionDataSpace(android_dataspace dataspace) {
-    ANativeWindow* const window = new FramebufferNativeWindow();
+    ANativeWindow* const window = mNativeWindow.get();
     native_window_set_buffers_data_space(window, dataspace);
 }
 #endif
@@ -517,12 +517,12 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
-#ifdef STE_HARDWARE
+/*#ifdef STE_HARDWARE
     ANativeWindow* const window = new FramebufferNativeWindow();
-#else
+#else*/
     mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
-#endif
+//#endif
     mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
     eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
     eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);

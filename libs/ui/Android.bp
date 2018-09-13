@@ -50,7 +50,6 @@ cc_library_shared {
     sanitize: {
         //misc_undefined: ["integer"],
     },
-//        "FramebufferNativeWindow.cpp",
 
     srcs: [
         "ColorSpace.cpp",
@@ -58,6 +57,7 @@ cc_library_shared {
         "Fence.cpp",
         "FenceTime.cpp",
         "FrameStats.cpp",
+        "FramebufferNativeWindow.cpp",
         "Gralloc2.cpp",
         "GraphicBuffer.cpp",
         "GraphicBufferAllocator.cpp",
@@ -128,6 +128,5 @@ cc_library_headers {
 }
 
 subdirs = [
-    "tests",
     "tools",
 ]
