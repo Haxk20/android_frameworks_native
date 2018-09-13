@@ -30,9 +30,6 @@
 
 #include <ui/DisplayInfo.h>
 #include <ui/PixelFormat.h>
-#ifdef STE_HARDWARE
-//#include <ui/FramebufferNativeWindow.h>
-#endif
 
 #include <gui/Surface.h>
 
@@ -119,13 +116,9 @@ DisplayDevice::DisplayDevice(
       mActiveConfig(0)
 {
     // clang-format on
-/*#ifdef STE_HARDWARE
-    ANativeWindow* const window = new FramebufferNativeWindow();
-#else*/
     Surface* surface;
     mNativeWindow = surface = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
-//#endif
 
 #ifdef USE_HWC2
     mActiveColorMode = HAL_COLOR_MODE_NATIVE;
@@ -517,12 +510,7 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
-/*#ifdef STE_HARDWARE
-    ANativeWindow* const window = new FramebufferNativeWindow();
-#else*/
-    mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
-//#endif
     mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
     eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
     eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);
