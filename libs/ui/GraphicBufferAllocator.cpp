@@ -158,3 +158,6 @@ status_t GraphicBufferAllocator::free(buffer_handle_t handle)
 
 // ---------------------------------------------------------------------------
 }; // namespace android
+
+__strong_alias(_ZN7android22GraphicBufferAllocator5allocEjjiiPPK13native_handlePi,
+        _ZN7android22GraphicBufferAllocator5allocEjjijPPK13native_handlePj);
