@@ -179,16 +179,6 @@ enum {
      * with GRALLOC_USAGE_PROTECTED usage bits on.
      */
     NATIVE_WINDOW_CONSUMER_IS_PROTECTED = 19,
-
-    /*
-     * Returns data space for the buffers.
-     */
-    NATIVE_WINDOW_DATASPACE = 20,
-
-    /*
-     * Returns maxBufferCount set by BufferQueueConsumer
-     */
-    NATIVE_WINDOW_MAX_BUFFER_COUNT = 21,
 };
 
 /* Valid operations for the (*perform)() hook.
@@ -203,40 +193,37 @@ enum {
  */
 enum {
 // clang-format off
-    NATIVE_WINDOW_SET_USAGE                     =  0,   /* deprecated */
-    NATIVE_WINDOW_CONNECT                       =  1,   /* deprecated */
-    NATIVE_WINDOW_DISCONNECT                    =  2,   /* deprecated */
-    NATIVE_WINDOW_SET_CROP                      =  3,   /* private */
-    NATIVE_WINDOW_SET_BUFFER_COUNT              =  4,
-    NATIVE_WINDOW_SET_BUFFERS_GEOMETRY          =  5,   /* deprecated */
-    NATIVE_WINDOW_SET_BUFFERS_TRANSFORM         =  6,
-    NATIVE_WINDOW_SET_BUFFERS_TIMESTAMP         =  7,
-    NATIVE_WINDOW_SET_BUFFERS_DIMENSIONS        =  8,
-    NATIVE_WINDOW_SET_BUFFERS_FORMAT            =  9,
-    NATIVE_WINDOW_SET_SCALING_MODE              = 10,   /* private */
-    NATIVE_WINDOW_LOCK                          = 11,   /* private */
-    NATIVE_WINDOW_UNLOCK_AND_POST               = 12,   /* private */
-    NATIVE_WINDOW_API_CONNECT                   = 13,   /* private */
-    NATIVE_WINDOW_API_DISCONNECT                = 14,   /* private */
-    NATIVE_WINDOW_SET_BUFFERS_USER_DIMENSIONS   = 15,   /* private */
-    NATIVE_WINDOW_SET_POST_TRANSFORM_CROP       = 16,   /* deprecated, unimplemented */
-    NATIVE_WINDOW_SET_BUFFERS_STICKY_TRANSFORM  = 17,   /* private */
-    NATIVE_WINDOW_SET_SIDEBAND_STREAM           = 18,
-    NATIVE_WINDOW_SET_BUFFERS_DATASPACE         = 19,
-    NATIVE_WINDOW_SET_SURFACE_DAMAGE            = 20,   /* private */
-    NATIVE_WINDOW_SET_SHARED_BUFFER_MODE        = 21,
-    NATIVE_WINDOW_SET_AUTO_REFRESH              = 22,
-    NATIVE_WINDOW_GET_REFRESH_CYCLE_DURATION    = 23,
-    NATIVE_WINDOW_GET_NEXT_FRAME_ID             = 24,
-    NATIVE_WINDOW_ENABLE_FRAME_TIMESTAMPS       = 25,
-    NATIVE_WINDOW_GET_COMPOSITOR_TIMING         = 26,
-    NATIVE_WINDOW_GET_FRAME_TIMESTAMPS          = 27,
-    NATIVE_WINDOW_GET_WIDE_COLOR_SUPPORT        = 28,
-    NATIVE_WINDOW_GET_HDR_SUPPORT               = 29,
-    NATIVE_WINDOW_SET_USAGE64                   = 30,
-    NATIVE_WINDOW_GET_CONSUMER_USAGE64          = 31,
-    NATIVE_WINDOW_SET_BUFFERS_SMPTE2086_METADATA = 32,
-    NATIVE_WINDOW_SET_BUFFERS_CTA861_3_METADATA = 33,
+    NATIVE_WINDOW_SET_USAGE                 =  0,
+    NATIVE_WINDOW_CONNECT                   =  1,   /* deprecated */
+    NATIVE_WINDOW_DISCONNECT                =  2,   /* deprecated */
+    NATIVE_WINDOW_SET_CROP                  =  3,   /* private */
+    NATIVE_WINDOW_SET_BUFFER_COUNT          =  4,
+    NATIVE_WINDOW_SET_BUFFERS_GEOMETRY      =  5,   /* deprecated */
+    NATIVE_WINDOW_SET_BUFFERS_TRANSFORM     =  6,
+    NATIVE_WINDOW_SET_BUFFERS_TIMESTAMP     =  7,
+    NATIVE_WINDOW_SET_BUFFERS_DIMENSIONS    =  8,
+    NATIVE_WINDOW_SET_BUFFERS_FORMAT        =  9,
+    NATIVE_WINDOW_SET_SCALING_MODE          = 10,   /* private */
+    NATIVE_WINDOW_LOCK                      = 11,   /* private */
+    NATIVE_WINDOW_UNLOCK_AND_POST           = 12,   /* private */
+    NATIVE_WINDOW_API_CONNECT               = 13,   /* private */
+    NATIVE_WINDOW_API_DISCONNECT            = 14,   /* private */
+    NATIVE_WINDOW_SET_BUFFERS_USER_DIMENSIONS = 15, /* private */
+    NATIVE_WINDOW_SET_POST_TRANSFORM_CROP   = 16,   /* private */
+    NATIVE_WINDOW_SET_BUFFERS_STICKY_TRANSFORM = 17,/* private */
+    NATIVE_WINDOW_SET_SIDEBAND_STREAM       = 18,
+    NATIVE_WINDOW_SET_BUFFERS_DATASPACE     = 19,
+    NATIVE_WINDOW_SET_SURFACE_DAMAGE        = 20,   /* private */
+    NATIVE_WINDOW_SET_SHARED_BUFFER_MODE    = 21,
+    NATIVE_WINDOW_SET_AUTO_REFRESH          = 22,
+    NATIVE_WINDOW_GET_REFRESH_CYCLE_DURATION= 23,
+    NATIVE_WINDOW_GET_NEXT_FRAME_ID         = 24,
+    NATIVE_WINDOW_ENABLE_FRAME_TIMESTAMPS   = 25,
+    NATIVE_WINDOW_GET_COMPOSITOR_TIMING     = 26,
+    NATIVE_WINDOW_GET_FRAME_TIMESTAMPS      = 27,
+    NATIVE_WINDOW_GET_WIDE_COLOR_SUPPORT    = 28,
+    NATIVE_WINDOW_GET_HDR_SUPPORT           = 29,
+    NATIVE_WINDOW_GET_CONSUMER_USAGE64      = 31,
 // clang-format on
 };
 
@@ -547,18 +534,20 @@ struct ANativeWindow
 typedef struct ANativeWindow android_native_window_t __deprecated;
 
 /*
- *  native_window_set_usage64(..., usage)
+ *  native_window_set_usage(..., usage)
  *  Sets the intended usage flags for the next buffers
  *  acquired with (*lockBuffer)() and on.
- *
- *  Valid usage flags are defined in android/hardware_buffer.h
- *  All AHARDWAREBUFFER_USAGE_* flags can be specified as needed.
- *
+ *  By default (if this function is never called), a usage of
+ *      GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE
+ *  is assumed.
  *  Calling this function will usually cause following buffers to be
  *  reallocated.
  */
-static inline int native_window_set_usage(struct ANativeWindow* window, uint64_t usage) {
-    return window->perform(window, NATIVE_WINDOW_SET_USAGE64, usage);
+
+static inline int native_window_set_usage(
+        struct ANativeWindow* window, int usage)
+{
+    return window->perform(window, NATIVE_WINDOW_SET_USAGE, usage);
 }
 
 /* deprecated. Always returns 0. Don't call. */
@@ -598,6 +587,45 @@ static inline int native_window_set_crop(
         android_native_rect_t const * crop)
 {
     return window->perform(window, NATIVE_WINDOW_SET_CROP, crop);
+}
+
+/*
+ * native_window_set_post_transform_crop(..., crop)
+ * Sets which region of the next queued buffers needs to be considered.
+ * Depending on the scaling mode, a buffer's crop region is scaled and/or
+ * cropped to match the surface's size.  This function sets the crop in
+ * post-transformed pixel coordinates.
+ *
+ * The specified crop region applies to all buffers queued after it is called.
+ *
+ * If 'crop' is NULL, subsequently queued buffers won't be cropped.
+ *
+ * An error is returned if for instance the crop region is invalid, out of the
+ * buffer's bound or if the window is invalid.
+ */
+static inline int native_window_set_post_transform_crop(
+        struct ANativeWindow* window,
+        android_native_rect_t const * crop)
+{
+    return window->perform(window, NATIVE_WINDOW_SET_POST_TRANSFORM_CROP, crop);
+}
+
+/*
+ * native_window_set_active_rect(..., active_rect)
+ *
+ * This function is deprecated and will be removed soon.  For now it simply
+ * sets the post-transform crop for compatibility while multi-project commits
+ * get checked.
+ */
+static inline int native_window_set_active_rect(
+        struct ANativeWindow* window,
+        android_native_rect_t const * active_rect) __deprecated;
+
+static inline int native_window_set_active_rect(
+        struct ANativeWindow* window,
+        android_native_rect_t const * active_rect)
+{
+    return native_window_set_post_transform_crop(window, active_rect);
 }
 
 /*
@@ -709,42 +737,6 @@ static inline int native_window_set_buffers_data_space(
 {
     return window->perform(window, NATIVE_WINDOW_SET_BUFFERS_DATASPACE,
             dataSpace);
-}
-
-/*
- * native_window_set_buffers_smpte2086_metadata(..., metadata)
- * All buffers queued after this call will be associated with the SMPTE
- * ST.2086 metadata specified.
- *
- * metadata specifies additional information about the contents of the buffer
- * that may affect how it's displayed.  When it is nullptr, it means no such
- * information is available.  No SMPTE ST.2086 metadata is associated with the
- * buffers by default.
- */
-static inline int native_window_set_buffers_smpte2086_metadata(
-        struct ANativeWindow* window,
-        const struct android_smpte2086_metadata* metadata)
-{
-    return window->perform(window, NATIVE_WINDOW_SET_BUFFERS_SMPTE2086_METADATA,
-            metadata);
-}
-
-/*
- * native_window_set_buffers_cta861_3_metadata(..., metadata)
- * All buffers queued after this call will be associated with the CTA-861.3
- * metadata specified.
- *
- * metadata specifies additional information about the contents of the buffer
- * that may affect how it's displayed.  When it is nullptr, it means no such
- * information is available.  No CTA-861.3 metadata is associated with the
- * buffers by default.
- */
-static inline int native_window_set_buffers_cta861_3_metadata(
-        struct ANativeWindow* window,
-        const struct android_cta861_3_metadata* metadata)
-{
-    return window->perform(window, NATIVE_WINDOW_SET_BUFFERS_CTA861_3_METADATA,
-            metadata);
 }
 
 /*
@@ -959,7 +951,7 @@ static inline int native_window_get_hdr_support(struct ANativeWindow* window,
 }
 
 static inline int native_window_get_consumer_usage(struct ANativeWindow* window,
-                                                   uint64_t* outUsage) {
+                                                   uint32_t* outUsage) {
     return window->perform(window, NATIVE_WINDOW_GET_CONSUMER_USAGE64, outUsage);
 }
 
