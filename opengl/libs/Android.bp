@@ -113,6 +113,16 @@ cc_library_static {
     },
 }
 
+cc_library_static {
+    name: "libEGL_blobCache",
+    defaults: ["egl_libs_defaults"],
+    srcs: [
+        "EGL/BlobCache.cpp",
+        "EGL/FileBlobCache.cpp",
+    ],
+    export_include_dirs: ["EGL"],
+}
+
 cc_library_shared {
     name: "libEGL",
     cppflags: ["-DWORKAROUND_BUG_10194508"],
