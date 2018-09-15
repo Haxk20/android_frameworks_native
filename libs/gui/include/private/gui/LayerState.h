@@ -150,6 +150,22 @@ struct DisplayState {
     status_t read(const Parcel& input);
 };
 
+#ifndef LIBGUI
+static inline
+int compare_type(const ComposerState& lhs, const ComposerState& rhs) {
+    if (lhs.client < rhs.client) return -1;
+    if (lhs.client > rhs.client) return 1;
+    if (lhs.state.surface < rhs.state.surface)  return -1;
+    if (lhs.state.surface > rhs.state.surface)  return 1;
+    return 0;
+}
+
+static inline
+int compare_type(const DisplayState& lhs, const DisplayState& rhs) {
+    return compare_type(lhs.token, rhs.token);
+}
+#endif
+
 }; // namespace android
 
 #endif // ANDROID_SF_LAYER_STATE_H
