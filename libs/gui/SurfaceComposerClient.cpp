@@ -171,6 +171,7 @@ void ComposerService::composerServiceDied()
 }
 
 // ---------------------------------------------------------------------------
+
 static inline
 int compare_type(const ComposerState& lhs, const ComposerState& rhs) {
     if (lhs.client < rhs.client)  return -1;
