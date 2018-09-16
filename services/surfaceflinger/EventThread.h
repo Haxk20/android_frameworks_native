@@ -14,38 +14,36 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef ANDROID_SURFACE_FLINGER_EVENT_THREAD_H
+#define ANDROID_SURFACE_FLINGER_EVENT_THREAD_H
 
 #include <stdint.h>
 #include <sys/types.h>
-#include <condition_variable>
-#include <mutex>
-#include <thread>
 
-#include <android-base/thread_annotations.h>
-
+#include <private/gui/BitTube.h>
 #include <gui/DisplayEventReceiver.h>
 #include <gui/IDisplayEventConnection.h>
-#include <private/gui/BitTube.h>
 
 #include <utils/Errors.h>
+#include <utils/threads.h>
 #include <utils/SortedVector.h>
 
 #include "DisplayDevice.h"
+#include "DisplayHardware/PowerHAL.h"
 
 // ---------------------------------------------------------------------------
 namespace android {
 // ---------------------------------------------------------------------------
 
-class EventThreadTest;
 class SurfaceFlinger;
 class String8;
 
 // ---------------------------------------------------------------------------
 
-class VSyncSource {
+
+class VSyncSource : public virtual RefBase {
 public:
-    class Callback {
+    class Callback: public virtual RefBase {
     public:
         virtual ~Callback() {}
         virtual void onVSyncEvent(nsecs_t when) = 0;
@@ -53,39 +51,15 @@ public:
 
     virtual ~VSyncSource() {}
     virtual void setVSyncEnabled(bool enable) = 0;
-    virtual void setCallback(Callback* callback) = 0;
+    virtual void setCallback(const sp<Callback>& callback) = 0;
     virtual void setPhaseOffset(nsecs_t phaseOffset) = 0;
 };
 
-class EventThread {
-public:
-    virtual ~EventThread();
-
-    virtual sp<BnDisplayEventConnection> createEventConnection() const = 0;
-
-    // called before the screen is turned off from main thread
-    virtual void onScreenReleased() = 0;
-
-    // called after the screen is turned on from main thread
-    virtual void onScreenAcquired() = 0;
-
-    // called when receiving a hotplug event
-    virtual void onHotplugReceived(int type, bool connected) = 0;
-
-    virtual void dump(String8& result) const = 0;
-
-    virtual void setPhaseOffset(nsecs_t phaseOffset) = 0;
-};
-
-namespace impl {
-
-class EventThread : public android::EventThread, private VSyncSource::Callback {
+class EventThread : public Thread, private VSyncSource::Callback {
     class Connection : public BnDisplayEventConnection {
     public:
-        explicit Connection(EventThread* eventThread);
-        virtual ~Connection();
-
-        virtual status_t postEvent(const DisplayEventReceiver::Event& event);
+        explicit Connection(const sp<EventThread>& eventThread);
+        status_t postEvent(const DisplayEventReceiver::Event& event);
 
         // count >= 1 : continuous event. count is the vsync rate
         // count == 0 : one-shot event that has not fired
@@ -93,79 +67,80 @@ class EventThread : public android::EventThread, private VSyncSource::Callback {
         int32_t count;
 
     private:
+        virtual ~Connection();
         virtual void onFirstRef();
         status_t stealReceiveChannel(gui::BitTube* outChannel) override;
         status_t setVsyncRate(uint32_t count) override;
-        void requestNextVsync() override; // asynchronous
-        EventThread* const mEventThread;
+        void requestNextVsync() override;    // asynchronous
+        sp<EventThread> const mEventThread;
         gui::BitTube mChannel;
     };
 
 public:
-    using ResyncWithRateLimitCallback = std::function<void()>;
-    using InterceptVSyncsCallback = std::function<void(nsecs_t)>;
 
-    EventThread(VSyncSource* src, ResyncWithRateLimitCallback resyncWithRateLimitCallback,
-                InterceptVSyncsCallback interceptVSyncsCallback, const char* threadName);
-    ~EventThread();
+    EventThread(const sp<VSyncSource>& src, SurfaceFlinger& flinger, bool interceptVSyncs);
 
-    sp<BnDisplayEventConnection> createEventConnection() const override;
+    sp<Connection> createEventConnection() const;
     status_t registerDisplayEventConnection(const sp<Connection>& connection);
 
     void setVsyncRate(uint32_t count, const sp<Connection>& connection);
     void requestNextVsync(const sp<Connection>& connection);
 
     // called before the screen is turned off from main thread
-    void onScreenReleased() override;
+    void onScreenReleased();
 
     // called after the screen is turned on from main thread
-    void onScreenAcquired() override;
+    void onScreenAcquired();
 
     // called when receiving a hotplug event
-    void onHotplugReceived(int type, bool connected) override;
+    void onHotplugReceived(int type, bool connected);
 
-    void dump(String8& result) const override;
+    Vector< sp<EventThread::Connection> > waitForEvent(
+            DisplayEventReceiver::Event* event);
 
-    void setPhaseOffset(nsecs_t phaseOffset) override;
+    void dump(String8& result) const;
+    void sendVsyncHintOff();
+
+    void setPhaseOffset(nsecs_t phaseOffset);
 
 private:
-    friend EventThreadTest;
+    virtual bool        threadLoop();
+    virtual void        onFirstRef();
 
-    void threadMain();
-    Vector<sp<EventThread::Connection>> waitForEventLocked(std::unique_lock<std::mutex>* lock,
-                                                           DisplayEventReceiver::Event* event)
-            REQUIRES(mMutex);
+    virtual void onVSyncEvent(nsecs_t timestamp);
 
-    void removeDisplayEventConnectionLocked(const wp<Connection>& connection) REQUIRES(mMutex);
-    void enableVSyncLocked() REQUIRES(mMutex);
-    void disableVSyncLocked() REQUIRES(mMutex);
-
-    // Implements VSyncSource::Callback
-    void onVSyncEvent(nsecs_t timestamp) override;
+    void removeDisplayEventConnection(const wp<Connection>& connection);
+    void enableVSyncLocked();
+    void disableVSyncLocked();
+    void sendVsyncHintOnLocked();
 
     // constants
-    VSyncSource* const mVSyncSource GUARDED_BY(mMutex) = nullptr;
-    const ResyncWithRateLimitCallback mResyncWithRateLimitCallback;
-    const InterceptVSyncsCallback mInterceptVSyncsCallback;
+    sp<VSyncSource> mVSyncSource;
+    PowerHAL mPowerHAL;
+    SurfaceFlinger& mFlinger;
 
-    std::thread mThread;
-    mutable std::mutex mMutex;
-    mutable std::condition_variable mCondition;
+    mutable Mutex mLock;
+    mutable Condition mCondition;
 
     // protected by mLock
-    SortedVector<wp<Connection>> mDisplayEventConnections GUARDED_BY(mMutex);
-    Vector<DisplayEventReceiver::Event> mPendingEvents GUARDED_BY(mMutex);
-    DisplayEventReceiver::Event mVSyncEvent[DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES] GUARDED_BY(
-            mMutex);
-    bool mUseSoftwareVSync GUARDED_BY(mMutex) = false;
-    bool mVsyncEnabled GUARDED_BY(mMutex) = false;
-    bool mKeepRunning GUARDED_BY(mMutex) = true;
+    SortedVector< wp<Connection> > mDisplayEventConnections;
+    Vector< DisplayEventReceiver::Event > mPendingEvents;
+    DisplayEventReceiver::Event mVSyncEvent[DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES];
+    bool mUseSoftwareVSync;
+    bool mVsyncEnabled;
 
     // for debugging
-    bool mDebugVsyncEnabled GUARDED_BY(mMutex) = false;
+    bool mDebugVsyncEnabled;
+
+    bool mVsyncHintSent;
+    const bool mInterceptVSyncs;
+    timer_t mTimerId;
 };
 
 // ---------------------------------------------------------------------------
 
-} // namespace impl
-} // namespace android
+}; // namespace android
+
+// ---------------------------------------------------------------------------
+
+#endif /* ANDROID_SURFACE_FLINGER_EVENT_THREAD_H */

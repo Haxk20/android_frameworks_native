@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,35 +14,30 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_EVENTCONTROLTHREAD_H
-#define ANDROID_EVENTCONTROLTHREAD_H
+#ifndef ANDROID_SF_POWER_HAL_H
+#define ANDROID_SF_POWER_HAL_H
 
-#include <stddef.h>
-
+#include <stdint.h>
+#include <sys/types.h>
 #include <utils/Mutex.h>
-#include <utils/Thread.h>
+
+#include <powermanager/IPowerManager.h>
+#include <hardware/power.h>
 
 namespace android {
+// ---------------------------------------------------------------------------
 
-class SurfaceFlinger;
-
-class EventControlThread: public Thread {
+class PowerHAL
+{
 public:
-
-    explicit EventControlThread(const sp<SurfaceFlinger>& flinger);
-    virtual ~EventControlThread() {}
-
-    void setVsyncEnabled(bool enabled);
-    virtual bool threadLoop();
+    status_t vsyncHint(bool enabled);
 
 private:
-    sp<SurfaceFlinger> mFlinger;
-    bool mVsyncEnabled;
-
-    Mutex mMutex;
-    Condition mCond;
+    sp<IPowerManager> mPowerManager;
+    Mutex mlock;
 };
 
-}
+// ---------------------------------------------------------------------------
+}; // namespace android
 
-#endif // ANDROID_EVENTCONTROLTHREAD_H
+#endif // ANDROID_SF_POWER_HAL_H

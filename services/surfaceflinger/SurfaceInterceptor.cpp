@@ -31,10 +31,6 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
-SurfaceInterceptor::~SurfaceInterceptor() = default;
-
-namespace impl {
-
 SurfaceInterceptor::SurfaceInterceptor(SurfaceFlinger* flinger)
     :   mFlinger(flinger)
 {
@@ -338,9 +334,12 @@ void SurfaceInterceptor::addSurfaceChangesLocked(Transaction* transaction,
     if (state.what & layer_state_t::eSizeChanged) {
         addSizeLocked(transaction, layerId, state.w, state.h);
     }
+#warning implement addAlphaLocked
+#if 0
     if (state.what & layer_state_t::eAlphaChanged) {
-        addAlphaLocked(transaction, layerId, state.alpha);
+        addAlphaLocked(transaction, layerId, state.color.a);
     }
+#endif
     if (state.what & layer_state_t::eMatrixChanged) {
         addMatrixLocked(transaction, layerId, state.matrix);
     }
@@ -597,5 +596,5 @@ void SurfaceInterceptor::savePowerModeUpdate(int32_t displayId, int32_t mode) {
     addPowerModeUpdateLocked(createTraceIncrementLocked(), displayId, mode);
 }
 
-} // namespace impl
+
 } // namespace android

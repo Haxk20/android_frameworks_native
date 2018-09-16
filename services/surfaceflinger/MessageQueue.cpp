@@ -14,30 +14,32 @@
  * limitations under the License.
  */
 
-#include <errno.h>
 #include <stdint.h>
+#include <errno.h>
 #include <sys/types.h>
 
 #include <binder/IPCThreadState.h>
 
-#include <utils/Log.h>
-#include <utils/Timers.h>
 #include <utils/threads.h>
+#include <utils/Timers.h>
+#include <utils/Log.h>
 
-#include <gui/DisplayEventReceiver.h>
 #include <gui/IDisplayEventConnection.h>
 
-#include "EventThread.h"
 #include "MessageQueue.h"
+#include "EventThread.h"
 #include "SurfaceFlinger.h"
 
 namespace android {
 
 // ---------------------------------------------------------------------------
 
-MessageBase::MessageBase() : MessageHandler() {}
+MessageBase::MessageBase()
+    : MessageHandler() {
+}
 
-MessageBase::~MessageBase() {}
+MessageBase::~MessageBase() {
+}
 
 void MessageBase::handleMessage(const Message&) {
     this->handler();
@@ -45,12 +47,6 @@ void MessageBase::handleMessage(const Message&) {
 };
 
 // ---------------------------------------------------------------------------
-
-MessageQueue::~MessageQueue() = default;
-
-// ---------------------------------------------------------------------------
-
-namespace impl {
 
 void MessageQueue::Handler::dispatchRefresh() {
     if ((android_atomic_or(eventMaskRefresh, &mEventMask) & eventMaskRefresh) == 0) {
@@ -79,26 +75,27 @@ void MessageQueue::Handler::handleMessage(const Message& message) {
 
 // ---------------------------------------------------------------------------
 
-void MessageQueue::init(const sp<SurfaceFlinger>& flinger) {
+MessageQueue::MessageQueue()
+{
+}
+
+MessageQueue::~MessageQueue() {
+}
+
+void MessageQueue::init(const sp<SurfaceFlinger>& flinger)
+{
     mFlinger = flinger;
     mLooper = new Looper(true);
     mHandler = new Handler(*this);
 }
 
-void MessageQueue::setEventThread(android::EventThread* eventThread) {
-    if (mEventThread == eventThread) {
-        return;
-    }
-
-    if (mEventTube.getFd() >= 0) {
-        mLooper->removeFd(mEventTube.getFd());
-    }
-
+void MessageQueue::setEventThread(const sp<EventThread>& eventThread)
+{
     mEventThread = eventThread;
     mEvents = eventThread->createEventConnection();
     mEvents->stealReceiveChannel(&mEventTube);
-    mLooper->addFd(mEventTube.getFd(), 0, Looper::EVENT_INPUT, MessageQueue::cb_eventReceiver,
-                   this);
+    mLooper->addFd(mEventTube.getFd(), 0, Looper::EVENT_INPUT,
+            MessageQueue::cb_eventReceiver, this);
 }
 
 void MessageQueue::waitMessage() {
@@ -123,7 +120,9 @@ void MessageQueue::waitMessage() {
     } while (true);
 }
 
-status_t MessageQueue::postMessage(const sp<MessageBase>& messageHandler, nsecs_t relTime) {
+status_t MessageQueue::postMessage(
+        const sp<MessageBase>& messageHandler, nsecs_t relTime)
+{
     const Message dummyMessage;
     if (relTime > 0) {
         mLooper->sendMessageDelayed(relTime, messageHandler, dummyMessage);
@@ -132,6 +131,7 @@ status_t MessageQueue::postMessage(const sp<MessageBase>& messageHandler, nsecs_
     }
     return NO_ERROR;
 }
+
 
 void MessageQueue::invalidate() {
     mEvents->requestNextVsync();
@@ -142,7 +142,7 @@ void MessageQueue::refresh() {
 }
 
 int MessageQueue::cb_eventReceiver(int fd, int events, void* data) {
-    MessageQueue* queue = reinterpret_cast<MessageQueue*>(data);
+    MessageQueue* queue = reinterpret_cast<MessageQueue *>(data);
     return queue->eventReceiver(fd, events);
 }
 
@@ -150,7 +150,7 @@ int MessageQueue::eventReceiver(int /*fd*/, int /*events*/) {
     ssize_t n;
     DisplayEventReceiver::Event buffer[8];
     while ((n = DisplayEventReceiver::getEvents(&mEventTube, buffer, 8)) > 0) {
-        for (int i = 0; i < n; i++) {
+        for (int i=0 ; i<n ; i++) {
             if (buffer[i].header.type == DisplayEventReceiver::DISPLAY_EVENT_VSYNC) {
                 mHandler->dispatchInvalidate();
                 break;
@@ -162,5 +162,4 @@ int MessageQueue::eventReceiver(int /*fd*/, int /*events*/) {
 
 // ---------------------------------------------------------------------------
 
-} // namespace impl
-} // namespace android
+}; // namespace android

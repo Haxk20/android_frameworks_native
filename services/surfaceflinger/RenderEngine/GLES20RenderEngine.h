@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+
 #ifndef SF_GLES20RENDERENGINE_H_
 #define SF_GLES20RENDERENGINE_H_
 
@@ -23,9 +24,9 @@
 #include <GLES2/gl2.h>
 #include <Transform.h>
 
-#include "Description.h"
-#include "ProgramCache.h"
 #include "RenderEngine.h"
+#include "ProgramCache.h"
+#include "Description.h"
 
 // ---------------------------------------------------------------------------
 namespace android {
@@ -34,9 +35,6 @@ namespace android {
 class String8;
 class Mesh;
 class Texture;
-
-namespace RE {
-namespace impl {
 
 class GLES20RenderEngine : public RenderEngine {
     GLuint mProtectedTexName;
@@ -56,32 +54,55 @@ class GLES20RenderEngine : public RenderEngine {
     Description mState;
     Vector<Group> mGroupStack;
 
-    virtual void bindImageAsFramebuffer(EGLImageKHR image, uint32_t* texName, uint32_t* fbName,
-                                        uint32_t* status);
+    virtual void bindImageAsFramebuffer(EGLImageKHR image,
+            uint32_t* texName, uint32_t* fbName, uint32_t* status);
     virtual void unbindFramebuffer(uint32_t texName, uint32_t fbName);
 
 public:
     GLES20RenderEngine(uint32_t featureFlags); // See RenderEngine::FeatureFlag
-    virtual ~GLES20RenderEngine();
 
 protected:
+    virtual ~GLES20RenderEngine();
+
     virtual void dump(String8& result);
-    virtual void setViewportAndProjection(size_t vpw, size_t vph, Rect sourceCrop, size_t hwh,
-                                          bool yswap, Transform::orientation_flags rotation);
-    virtual void setupLayerBlending(bool premultipliedAlpha, bool opaque, bool disableTexture,
-                                    const half4& color) override;
+    virtual void setViewportAndProjection(size_t vpw, size_t vph,
+            Rect sourceCrop, size_t hwh, bool yswap,
+            Transform::orientation_flags rotation);
+#ifdef USE_HWC2
+    virtual void setupLayerBlending(bool premultipliedAlpha, bool opaque,
+            float alpha) override;
+    virtual void setupDimLayerBlending(float alpha) override;
 
     // Color management related functions and state
-    void setSourceY410BT2020(bool enable) override;
-    void setSourceDataSpace(ui::Dataspace source) override;
-    void setOutputDataSpace(ui::Dataspace dataspace) override;
-    void setDisplayMaxLuminance(const float maxLuminance) override;
+    void setColorMode(android_color_mode mode);
+    void setSourceDataSpace(android_dataspace source);
+    void setWideColor(bool hasWideColor);
+    bool usesWideColor();
+
+    // Current color mode of display using the render engine
+    android_color_mode mColorMode = HAL_COLOR_MODE_NATIVE;
+
+    // Current dataspace of layer being rendered
+    android_dataspace mDataSpace = HAL_DATASPACE_V0_SRGB;
+
+    // Indicate if wide-color mode is needed or not
+    bool mDisplayHasWideColor = false;
+    bool mUseWideColor = false;
+    uint64_t mWideColorFrameCount = 0;
+
+    // Currently only supporting sRGB and DisplayP3 color spaces
+    mat4 mSrgbToDisplayP3;
+#else
+    virtual void setupLayerBlending(bool premultipliedAlpha, bool opaque,
+            int alpha);
+    virtual void setupDimLayerBlending(int alpha);
+#endif
+    bool mPlatformHasWideColor = false;
 
     virtual void setupLayerTexturing(const Texture& texture);
     virtual void setupLayerBlackedOut();
     virtual void setupFillWithColor(float r, float g, float b, float a);
-    virtual void setupColorTransform(const mat4& colorTransform);
-    virtual void setSaturationMatrix(const mat4& saturationMatrix);
+    virtual mat4 setupColorTransform(const mat4& colorTransform);
     virtual void disableTexturing();
     virtual void disableBlending();
 
@@ -89,35 +110,10 @@ protected:
 
     virtual size_t getMaxTextureSize() const;
     virtual size_t getMaxViewportDims() const;
-
-    // Current dataspace of layer being rendered
-    ui::Dataspace mDataSpace = ui::Dataspace::UNKNOWN;
-
-    // Current output dataspace of the render engine
-    ui::Dataspace mOutputDataSpace = ui::Dataspace::UNKNOWN;
-
-    // Currently only supporting sRGB, BT2020 and DisplayP3 color spaces
-    const bool mPlatformHasWideColor = false;
-    mat4 mSrgbToDisplayP3;
-    mat4 mDisplayP3ToSrgb;
-    mat3 mSrgbToXyz;
-    mat3 mBt2020ToXyz;
-    mat3 mDisplayP3ToXyz;
-    mat4 mXyzToSrgb;
-    mat4 mXyzToDisplayP3;
-    mat4 mXyzToBt2020;
-
-private:
-    // A data space is considered HDR data space if it has BT2020 color space
-    // with PQ or HLG transfer function.
-    bool isHdrDataSpace(const ui::Dataspace dataSpace) const;
-    bool needsXYZTransformMatrix() const;
 };
 
 // ---------------------------------------------------------------------------
-} // namespace impl
-} // namespace RE
-} // namespace android
+}; // namespace android
 // ---------------------------------------------------------------------------
 
 #endif /* SF_GLES20RENDERENGINE_H_ */

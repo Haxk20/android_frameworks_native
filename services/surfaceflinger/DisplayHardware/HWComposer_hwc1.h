@@ -25,6 +25,7 @@
 #include <system/graphics.h>
 
 #include <ui/Fence.h>
+#include <ui/GraphicTypes.h>
 
 #include <utils/BitSet.h>
 #include <utils/Condition.h>
@@ -190,7 +191,7 @@ public:
         virtual status_t setLayer(size_t index) = 0;
         virtual HWCLayer* dup() = 0;
         static HWCLayer* copy(HWCLayer *rhs) {
-            return rhs ? rhs->dup() : nullptr;
+            return rhs ? rhs->dup() : NULL;
         }
     protected:
         virtual ~HWCLayer() { }
@@ -205,7 +206,7 @@ public:
         HWCLayer* const mLayerList;
         size_t mIndex;
 
-        LayerListIterator() : mLayerList(nullptr), mIndex(0) { }
+        LayerListIterator() : mLayerList(NULL), mIndex(0) { }
 
         LayerListIterator(HWCLayer* layer, size_t index)
             : mLayerList(layer), mIndex(index) { }
@@ -261,7 +262,7 @@ public:
         float xdpi;
         float ydpi;
         nsecs_t refresh;
-        android_color_mode_t colorMode;
+        android::ui::ColorMode colorMode;
         bool operator==(const DisplayConfig& rhs) const {
             return width == rhs.width &&
                     height == rhs.height &&
@@ -286,7 +287,7 @@ public:
     float getDpiX(int disp) const;
     float getDpiY(int disp) const;
     nsecs_t getRefreshPeriod(int disp) const;
-    android_color_mode_t getColorMode(int disp) const;
+    android::ui::ColorMode getColorMode(int disp) const;
 
     const Vector<DisplayConfig>& getConfigs(int disp) const;
     size_t getCurrentConfig(int disp) const;
@@ -371,8 +372,8 @@ private:
     sp<SurfaceFlinger>              mFlinger;
     framebuffer_device_t*           mFbDev;
     struct hwc_composer_device_1*   mHwc;
-    // invariant: mLists[0] != nullptr iff mHwc != nullptr
-    // mLists[i>0] can be nullptr. that display is to be ignored
+    // invariant: mLists[0] != NULL iff mHwc != NULL
+    // mLists[i>0] can be NULL. that display is to be ignored
     struct hwc_display_contents_1*  mLists[MAX_HWC_DISPLAYS];
     DisplayData                     mDisplayData[MAX_HWC_DISPLAYS];
     // protect mDisplayData from races between prepare and dump
