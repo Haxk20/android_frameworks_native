@@ -16,12 +16,9 @@
 
 #include <ui/DebugUtils.h>
 #include <ui/PixelFormat.h>
-#include <ui/Rect.h>
 
 #include <android-base/stringprintf.h>
 #include <string>
-
-using android::base::StringPrintf;
 
 std::string decodeStandard(android_dataspace dataspace) {
     const uint32_t dataspaceSelect = (dataspace & HAL_DATASPACE_STANDARD_MASK);
@@ -190,7 +187,7 @@ std::string decodeRange(android_dataspace dataspace) {
 
 std::string dataspaceDetails(android_dataspace dataspace) {
     if (dataspace == 0) {
-        return "Default";
+        return "Default (0)";
     }
     return android::base::StringPrintf("%s %s %s", decodeStandard(dataspace).c_str(),
                                        decodeTransfer(dataspace).c_str(),
@@ -264,8 +261,4 @@ std::string decodePixelFormat(android::PixelFormat format) {
         default:
             return android::base::StringPrintf("Unknown %#08x", format);
     }
-}
-
-std::string to_string(const android::Rect& rect) {
-    return StringPrintf("(%4d,%4d,%4d,%4d)", rect.left, rect.top, rect.right, rect.bottom);
 }

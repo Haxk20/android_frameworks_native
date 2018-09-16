@@ -20,12 +20,11 @@ cc_library_shared {
     },
 
     clang: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
+    cflags: ["-DEGL_NEEDS_HANDLE"],
     cppflags: [
         "-Weverything",
+        "-Wno-unused-variable",
+        "-Wno-unused-function",
 
         // The static constructors and destructors in this library have not been noted to
         // introduce significant overheads
@@ -44,13 +43,11 @@ cc_library_shared {
 
         // Don't warn about struct padding
         "-Wno-padded",
-        "-DEGL_NEEDS_HANDLE",
     ],
 
     sanitize: {
         //misc_undefined: ["integer"],
     },
-//        "FramebufferNativeWindow.cpp",
 
     srcs: [
         "ColorSpace.cpp",
@@ -58,7 +55,7 @@ cc_library_shared {
         "Fence.cpp",
         "FenceTime.cpp",
         "FrameStats.cpp",
-        "Gralloc2.cpp",
+        "FramebufferNativeWindow.cpp",
         "GraphicBuffer.cpp",
         "GraphicBufferAllocator.cpp",
         "GraphicBufferMapper.cpp",
@@ -126,7 +123,3 @@ cc_library_headers {
     export_include_dirs: ["include"],
     vendor_available: true,
 }
-
-subdirs = [
-    "tools",
-]
