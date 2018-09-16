@@ -3750,6 +3750,11 @@ status_t SurfaceFlinger::captureScreen(const sp<IBinder>& /*display*/,
     return -EINVAL;
 }
 
+status_t SurfaceFlinger::captureLayers(const sp<IBinder>& /*layerHandleBinder*/,
+                                       sp<GraphicBuffer>* /*outBuffer*/, const Rect& /*sourceCrop*/,
+                                       float /*frameScale*/, bool /*childrenOnly*/) {
+    return NO_ERROR;
+}
 
 void SurfaceFlinger::renderScreenImplLocked(
         const sp<const DisplayDevice>& hw,
