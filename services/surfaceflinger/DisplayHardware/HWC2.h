@@ -23,6 +23,7 @@
 #undef HWC2_INCLUDE_STRINGIFICATION
 #undef HWC2_USE_CPP11
 
+#include <ui/GraphicTypes.h>
 #include <ui/HdrCapabilities.h>
 #include <math/mat4.h>
 
