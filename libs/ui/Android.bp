@@ -135,6 +135,5 @@ cc_library_headers {
 }
 
 subdirs = [
-    "tests",
     "tools",
 ]
