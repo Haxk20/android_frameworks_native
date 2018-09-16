@@ -63,7 +63,7 @@ private:
         uint32_t stride;
         PixelFormat format;
         uint32_t layerCount;
-        uint32_t usage;
+        uint64_t usage;
         size_t size;
         std::string requestorName;
     };
