@@ -2362,11 +2362,13 @@ status_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
         } else {
             if (mCurrentState.layersSortedByZ.indexOf(parent) < 0) {
                 ALOGE("addClientLayer called with a removed parent");
-                return NAME_NOT_FOUND;
+                //return NO_ERROR;
+                mCurrentState.layersSortedByZ.add(lbc);
+                goto skip;
             }
             parent->addChild(lbc);
         }
-
+skip:
         mGraphicBufferProducerList.add(IInterface::asBinder(gbc));
         mLayersAdded = true;
         mNumLayers++;
