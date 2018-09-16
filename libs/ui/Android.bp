@@ -44,12 +44,13 @@ cc_library_shared {
 
         // Don't warn about struct padding
         "-Wno-padded",
-	        "-DEGL_NEEDS_HANDLE",
+        "-DEGL_NEEDS_HANDLE",
     ],
 
     sanitize: {
-        integer_overflow: true,
+        //misc_undefined: ["integer"],
     },
+//        "FramebufferNativeWindow.cpp",
 
     srcs: [
         "ColorSpace.cpp",
@@ -71,7 +72,6 @@ cc_library_shared {
     include_dirs: [
         "frameworks/native/include",
     ],
-
 
     shared_libs: [
         "android.hardware.graphics.allocator@2.0",
@@ -103,12 +103,12 @@ cc_library_shared {
     ],
 
     header_libs: [
-        "libbase_headers",
         "libnativebase_headers",
         "libhardware_headers",
-        "libui_headers",
         "libpdx_headers",
     ],
+
+    export_include_dirs: ["include"],
 
     export_static_lib_headers: [
         "libarect",
@@ -116,10 +116,8 @@ cc_library_shared {
     ],
 
     export_header_lib_headers: [
-        "libbase_headers",
         "libnativebase_headers",
         "libhardware_headers",
-        "libui_headers",
     ],
 }
 
@@ -127,11 +125,6 @@ cc_library_headers {
     name: "libui_headers",
     export_include_dirs: ["include"],
     vendor_available: true,
-    target: {
-        vendor: {
-            override_export_include_dirs: ["include_vndk"],
-        },
-    },
 }
 
 subdirs = [
