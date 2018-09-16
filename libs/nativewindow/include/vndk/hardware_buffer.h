@@ -26,6 +26,28 @@ __BEGIN_DECLS
 
 const native_handle_t* AHardwareBuffer_getNativeHandle(const AHardwareBuffer* buffer);
 
+enum CreateFromHandleMethod {
+    // enum values chosen to match internal GraphicBuffer::HandleWrapMethod
+    AHARDWAREBUFFER_CREATE_FROM_HANDLE_METHOD_REGISTER = 2,
+    AHARDWAREBUFFER_CREATE_FROM_HANDLE_METHOD_CLONE = 3,
+};
+
+/**
+ * Create a AHardwareBuffer from a native handle.
+ *
+ * This function wraps a native handle in a AHardwareBuffer suitable for use by applications or
+ * other parts of the system. The contents of desc will be returned by AHardwareBuffer_describe().
+ *
+ * If method is AHARDWAREBUFFER_CREATE_FROM_HANDLE_METHOD_REGISTER, the handle is assumed to be
+ * unregistered, and it will be registered/imported before being wrapped in the AHardwareBuffer.
+ * If successful, the AHardwareBuffer will own the handle.
+ *
+ * If method is AHARDWAREBUFFER_CREATE_FROM_HANDLE_METHOD_CLONE, the handle will be cloned and the
+ * clone registered. The AHardwareBuffer will own the cloned handle but not the original.
+ */
+int AHardwareBuffer_createFromHandle(const AHardwareBuffer_Desc* desc,
+                                     const native_handle_t* handle, int32_t method,
+                                     AHardwareBuffer** outBuffer);
 
 /**
  * Buffer pixel formats.
@@ -42,38 +64,31 @@ enum {
     /* same as HAL_PIXEL_FORMAT_Y16 */
     AHARDWAREBUFFER_FORMAT_Y16                      = 0x20363159,
     /* same as HAL_PIXEL_FORMAT_RAW16 */
-    AHARDWAREBUFFER_FORMAT_RAW16                    = 38, // was 32
+    AHARDWAREBUFFER_FORMAT_RAW16                    = 0x20,
     /* same as HAL_PIXEL_FORMAT_RAW10 */
-    AHARDWAREBUFFER_FORMAT_RAW10                    = 43, // was 37
+    AHARDWAREBUFFER_FORMAT_RAW10                    = 0x25,
     /* same as HAL_PIXEL_FORMAT_RAW12 */
-    AHARDWAREBUFFER_FORMAT_RAW12                    = 44, // was 38
+    AHARDWAREBUFFER_FORMAT_RAW12                    = 0x26,
     /* same as HAL_PIXEL_FORMAT_RAW_OPAQUE */
-    AHARDWAREBUFFER_FORMAT_RAW_OPAQUE               = 42, // was 36
+    AHARDWAREBUFFER_FORMAT_RAW_OPAQUE               = 0x24,
     /* same as HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED */
-    AHARDWAREBUFFER_FORMAT_IMPLEMENTATION_DEFINED   = 40, // was 34
+    AHARDWAREBUFFER_FORMAT_IMPLEMENTATION_DEFINED   = 0x22,
     /* same as HAL_PIXEL_FORMAT_YCBCR_420_888 */
-    AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420             = 41, // was 35
-#ifdef STE_HARDWARE
-    AHARDWAREBUFFER_FORMAT_YCbCr_422_P        = 18,
-    AHARDWAREBUFFER_FORMAT_YCbCr_420_P        = 19,
-    AHARDWAREBUFFER_FORMAT_YCbCr_420_I        = 21,
-    AHARDWAREBUFFER_FORMAT_CbYCrY_422_I       = 22,
-    AHARDWAREBUFFER_FORMAT_CbYCrY_420_I       = 23,
-    AHARDWAREBUFFER_FORMAT_YCbCr_420_SP_TILED = 32,
-    AHARDWAREBUFFER_FORMAT_YCbCr_420_SP       = 33,
-    AHARDWAREBUFFER_FORMAT_YCrCb_420_SP_TILED = 34,
-    AHARDWAREBUFFER_FORMAT_YCrCb_422_SP       = 35,
-    AHARDWAREBUFFER_FORMAT_YCrCb_422_P        = 36,
-    AHARDWAREBUFFER_FORMAT_YCrCb_420_P        = 37,
-    /* STE: Added Support of YUV42XMBN, required for Copybit CC acceleration */
-    AHARDWAREBUFFER_FORMAT_YCBCR42XMBN        = 14,
-#endif
+    AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420             = 0x23,
+    /* same as HAL_PIXEL_FORMAT_YCBCR_422_888 */
+    AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_422             = 0x27,
+    /* same as HAL_PIXEL_FORMAT_YCBCR_444_888 */
+    AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_444             = 0x28,
+    /* same as HAL_PIXEL_FORMAT_FLEX_RGB_888 */
+    AHARDWAREBUFFER_FORMAT_FLEX_R8G8B8              = 0x29,
+    /* same as HAL_PIXEL_FORMAT_FLEX_RGBA_8888 */
+    AHARDWAREBUFFER_FORMAT_FLEX_R8G8B8A8            = 0x2A,
     /* same as HAL_PIXEL_FORMAT_YCBCR_422_SP */
-    AHARDWAREBUFFER_FORMAT_YCbCr_422_SP             = 16,
+    AHARDWAREBUFFER_FORMAT_YCbCr_422_SP             = 0x10,
     /* same as HAL_PIXEL_FORMAT_YCRCB_420_SP */
-    AHARDWAREBUFFER_FORMAT_YCrCb_420_SP             = 17,
+    AHARDWAREBUFFER_FORMAT_YCrCb_420_SP             = 0x11,
     /* same as HAL_PIXEL_FORMAT_YCBCR_422_I */
-    AHARDWAREBUFFER_FORMAT_YCbCr_422_I              = 20,
+    AHARDWAREBUFFER_FORMAT_YCbCr_422_I              = 0x14,
 };
 
 __END_DECLS
