@@ -138,9 +138,9 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client,
     mCurrentState.requestedCrop = mCurrentState.crop;
     mCurrentState.z = 0;
 #ifdef USE_HWC2
-    mCurrentState.color.a = 1.0f;
+    mCurrentState.alpha = 1.0f;
 #else
-    mCurrentState.color.a = 0xFF;
+    mCurrentState.alpha = 0xFF;
 #endif
     mCurrentState.layerStack = 0;
     mCurrentState.flags = layerFlags;
@@ -1894,10 +1894,10 @@ bool Layer::setAlpha(float alpha) {
 #else
 bool Layer::setAlpha(uint8_t alpha) {
 #endif
-    if (mCurrentState.color.a == alpha)
+    if (mCurrentState.alpha == alpha)
         return false;
     mCurrentState.sequence++;
-    mCurrentState.color.a = alpha;
+    mCurrentState.alpha = alpha;
     mCurrentState.modified = true;
     setTransactionFlags(eTransactionNeeded);
     return true;
@@ -2451,7 +2451,7 @@ LayerDebugInfo Layer::getLayerDebugInfo() const {
     info.mHeight = ds.active.h;
     info.mCrop = ds.crop;
     info.mFinalCrop = ds.finalCrop;
-    info.mColor = ds.color;
+    //info.mAlpha = ds.alpha;
     info.mFlags = ds.flags;
     info.mPixelFormat = getPixelFormat();
     info.mDataSpace = getDataSpace();
@@ -2787,7 +2787,7 @@ uint8_t Layer::getAlpha() const {
     const auto& p = mDrawingParent.promote();
 
     float parentAlpha = (p != nullptr) ? (p->getAlpha() / 255.0f) : 1.0;
-    float drawingAlpha = getDrawingState().color.a / 255.0f;
+    float drawingAlpha = getDrawingState().alpha / 255.0f;
     drawingAlpha = drawingAlpha * parentAlpha;
     return static_cast<uint8_t>(std::round(drawingAlpha * 255));
 }

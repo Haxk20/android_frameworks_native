@@ -47,11 +47,11 @@ void LayerDim::onDraw(const sp<const DisplayDevice>& hw,
         const Region& /* clip */, bool useIdentityTransform) const
 {
     const State& s(getDrawingState());
-    if (s.color.a>0) {
+    if (s.alpha>0) {
         Mesh mesh(Mesh::TRIANGLE_FAN, 4, 2);
         computeGeometry(hw, mesh, useIdentityTransform);
         RenderEngine& engine(mFlinger->getRenderEngine());
-        engine.setupDimLayerBlending(s.color.a);
+        engine.setupDimLayerBlending(s.alpha);
         engine.drawMesh(mesh);
         engine.disableBlending();
     }
@@ -59,7 +59,7 @@ void LayerDim::onDraw(const sp<const DisplayDevice>& hw,
 
 bool LayerDim::isVisible() const {
     const Layer::State& s(getDrawingState());
-    return !isHiddenByPolicy() && s.color.a;
+    return !isHiddenByPolicy() && s.alpha;
 }
 
 
