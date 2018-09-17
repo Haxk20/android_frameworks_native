@@ -731,6 +731,7 @@ static inline int native_window_set_buffers_format(
     return window->perform(window, NATIVE_WINDOW_SET_BUFFERS_FORMAT, format);
 }
 
+#ifdef __cplusplus
 /*
  * native_window_set_buffers_data_space(..., int dataSpace)
  * All buffers queued after this call will be associated with the dataSpace
@@ -768,6 +769,7 @@ static inline int native_window_set_buffers_smpte2086_metadata(
     return 0; /*window->perform(window, NATIVE_WINDOW_SET_BUFFERS_SMPTE2086_METADATA,
             metadata);*/
 }
+#endif
 
 /*
  * native_window_set_buffers_cta861_3_metadata(..., metadata)
