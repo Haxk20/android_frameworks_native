@@ -88,9 +88,7 @@ DisplayDevice::DisplayDevice(
         const sp<SurfaceFlinger>& flinger,
         DisplayType type,
         int32_t hwcId,
-#ifndef USE_HWC2
         int format,
-#endif
         bool isSecure,
         const wp<IBinder>& displayToken,
         const sp<DisplaySurface>& displaySurface,
@@ -107,9 +105,7 @@ DisplayDevice::DisplayDevice(
       mSurface(EGL_NO_SURFACE),
       mDisplayWidth(),
       mDisplayHeight(),
-#ifndef USE_HWC2
       mFormat(),
-#endif
       mFlags(),
       mPageFlipCount(),
       mIsSecure(isSecure),
@@ -128,7 +124,7 @@ DisplayDevice::DisplayDevice(
 #endif
 
 #ifdef USE_HWC2
-    mActiveColorMode = HAL_COLOR_MODE_NATIVE;
+    mActiveColorMode = static_cast<android::ui::ColorMode>(HAL_COLOR_MODE_NATIVE);
     mDisplayHasWideColor = supportWideColor;
 #else
     (void) supportWideColor;
@@ -141,7 +137,7 @@ DisplayDevice::DisplayDevice(
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (config == EGL_NO_CONFIG) {
 #ifdef USE_HWC2
-        config = RenderEngine::chooseEglConfig(display, PIXEL_FORMAT_RGBA_8888,
+        config = RenderEngine::chooseEglConfig(display, format,
                                                /*logConfig*/ false);
 #else
         config = RenderEngine::chooseEglConfig(display, format,
@@ -165,9 +161,7 @@ DisplayDevice::DisplayDevice(
     mConfig = config;
     mDisplay = display;
     mSurface = eglSurface;
-#ifndef USE_HWC2
     mFormat = format;
-#endif
     mPageFlipCount = 0;
     mViewport.makeInvalid();
     mFrame.makeInvalid();
@@ -175,7 +169,6 @@ DisplayDevice::DisplayDevice(
     // virtual displays are always considered enabled
     mPowerMode = (mType >= DisplayDevice::DISPLAY_VIRTUAL) ?
                   HWC_POWER_MODE_NORMAL : HWC_POWER_MODE_OFF;
-
 
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
@@ -217,11 +210,9 @@ int DisplayDevice::getHeight() const {
     return mDisplayHeight;
 }
 
-#ifndef USE_HWC2
 PixelFormat DisplayDevice::getFormat() const {
     return mFormat;
 }
-#endif
 
 EGLSurface DisplayDevice::getEGLSurface() const {
     return mSurface;
@@ -450,7 +441,7 @@ android::ui::ColorMode DisplayDevice::getActiveColorMode() const {
 }
 
 void DisplayDevice::setCompositionDataSpace(android_dataspace dataspace) {
-    ANativeWindow* const window = mNativeWindow.get();
+    ANativeWindow* const window = new FramebufferNativeWindow();
     native_window_set_buffers_data_space(window, dataspace);
 }
 #endif

@@ -828,7 +828,7 @@ std::unique_ptr<HdrCapabilities> HWComposer::getHdrCapabilities(
     }
 
     auto& hwcDisplay = mDisplayData[displayId].hwcDisplay;
-    std::unique_ptr<HdrCapabilities> capabilities;
+    HdrCapabilities capabilities;
     auto error = hwcDisplay->getHdrCapabilities(&capabilities);
     if (error != HWC2::Error::None) {
         ALOGE("getOutputCapabilities: Failed to get capabilities on display %d:"
@@ -837,7 +837,7 @@ std::unique_ptr<HdrCapabilities> HWComposer::getHdrCapabilities(
         return nullptr;
     }
 
-    return capabilities;
+    return std::make_unique<HdrCapabilities>(std::move(capabilities));
 }
 
 // Converts a PixelFormat to a human-readable string.  Max 11 chars.

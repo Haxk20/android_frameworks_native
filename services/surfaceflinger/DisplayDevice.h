@@ -88,9 +88,7 @@ public:
             const sp<SurfaceFlinger>& flinger,
             DisplayType type,
             int32_t hwcId,
-#ifndef USE_HWC2
             int format,
-#endif
             bool isSecure,
             const wp<IBinder>& displayToken,
             const sp<DisplaySurface>& displaySurface,
@@ -115,9 +113,7 @@ public:
 
     int         getWidth() const;
     int         getHeight() const;
-#ifndef USE_HWC2
     PixelFormat getFormat() const;
-#endif
     uint32_t    getFlags() const;
 
     EGLSurface  getEGLSurface() const;
@@ -230,9 +226,7 @@ private:
     EGLSurface      mSurface;
     int             mDisplayWidth;
     int             mDisplayHeight;
-#ifndef USE_HWC2
     PixelFormat     mFormat;
-#endif
     uint32_t        mFlags;
     mutable uint32_t mPageFlipCount;
     String8         mDisplayName;

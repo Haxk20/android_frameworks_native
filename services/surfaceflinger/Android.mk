@@ -44,6 +44,7 @@ LOCAL_MODULE := libsurfaceflinger
 LOCAL_C_INCLUDES := \
     hardware/interfaces/graphics/composer/2.1/utils/command-buffer/include \
     frameworks/native/vulkan/include \
+    frameworks/native/libs/vr/libpdx/private \
     external/vulkan-validation-layers/libs/vkjson \
     system/libhwbinder/fast_msgq/include \
 
