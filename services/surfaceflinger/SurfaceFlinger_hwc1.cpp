@@ -2028,7 +2028,7 @@ void SurfaceFlinger::computeVisibleRegions(const sp<const DisplayDevice>& displa
 
                 // compute the opaque region
                 const int32_t layerOrientation = tr.getOrientation();
-                if (s.alpha==255 && !translucent &&
+                if (s.color.a==255 && !translucent &&
                         ((layerOrientation & Transform::ROT_INVALID) == false)) {
                     // the opaque region is the layer's footprint
                     opaqueRegion = visibleRegion;
@@ -2301,7 +2301,7 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                         const Layer::State& state(layer->getDrawingState());
                         if ((cur->getHints() & HWC_HINT_CLEAR_FB)
                                 && i
-                                && layer->isOpaque(state) && (state.alpha == 0xFF)
+                                && layer->isOpaque(state) && (state.color.a == 0xFF)
                                 && hasGlesComposition) {
                             // never clear the very first layer since we're
                             // guaranteed the FB is already cleared
@@ -2627,10 +2627,13 @@ uint32_t SurfaceFlinger::setClientStateLocked(
                 flags |= eTraversalNeeded;
             }
         }
+#warning implement setAlpha
+#if 0
         if (what & layer_state_t::eAlphaChanged) {
-            if (layer->setAlpha(uint8_t(255.0f*s.alpha+0.5f)))
+            if (layer->setAlpha(uint8_t(255.0f*s.color.a+0.5f)))
                 flags |= eTraversalNeeded;
         }
+#endif
         if (what & layer_state_t::eMatrixChanged) {
             if (layer->setMatrix(s.matrix))
                 flags |= eTraversalNeeded;

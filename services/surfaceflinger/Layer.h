@@ -120,11 +120,6 @@ public:
         // to achieve mirroring.
         uint32_t layerStack;
 
-#ifdef USE_HWC2
-        float alpha;
-#else
-        uint8_t alpha;
-#endif
         uint8_t flags;
         uint8_t mask;
         uint8_t reserved[2];
@@ -159,6 +154,7 @@ public:
 
         // A list of surfaces whose Z-order is interpreted relative to ours.
         SortedVector<wp<Layer>> zOrderRelatives;
+        half4 color;
     };
 
     // -----------------------------------------------------------------------

@@ -98,7 +98,7 @@ void SurfaceInterceptor::addInitialSurfaceStateLocked(Increment* increment,
     addPositionLocked(transaction, layerId, layer->mCurrentState.active.transform.tx(),
             layer->mCurrentState.active.transform.ty());
     addDepthLocked(transaction, layerId, layer->mCurrentState.z);
-    addAlphaLocked(transaction, layerId, layer->mCurrentState.alpha);
+    addAlphaLocked(transaction, layerId, layer->mCurrentState.color.a);
     addTransparentRegionLocked(transaction, layerId, layer->mCurrentState.activeTransparentRegion);
     addLayerStackLocked(transaction, layerId, layer->mCurrentState.layerStack);
     addCropLocked(transaction, layerId, layer->mCurrentState.crop);
@@ -334,9 +334,12 @@ void SurfaceInterceptor::addSurfaceChangesLocked(Transaction* transaction,
     if (state.what & layer_state_t::eSizeChanged) {
         addSizeLocked(transaction, layerId, state.w, state.h);
     }
+#warning implement addAlphaLocked
+#if 0
     if (state.what & layer_state_t::eAlphaChanged) {
-        addAlphaLocked(transaction, layerId, state.alpha);
+        addAlphaLocked(transaction, layerId, state.color.a);
     }
+#endif
     if (state.what & layer_state_t::eMatrixChanged) {
         addMatrixLocked(transaction, layerId, state.matrix);
     }
