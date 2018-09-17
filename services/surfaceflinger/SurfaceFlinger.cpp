@@ -4705,11 +4705,12 @@ private:
     const int mApi;
 };
 
-status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display, sp<GraphicBuffer>* outBuffer,
-                                       Rect sourceCrop, uint32_t reqWidth, uint32_t reqHeight,
-                                       int32_t minLayerZ, int32_t maxLayerZ,
-                                       bool useIdentityTransform,
-                                       ISurfaceComposer::Rotation rotation) {
+status_t SurfaceFlinger::captureScreen(const sp<IBinder>& /*display*/, sp<GraphicBuffer>* /*outBuffer*/,
+                                       Rect /*sourceCrop*/, uint32_t /*reqWidth*/, uint32_t /*reqHeight*/,
+                                       int32_t /*minLayerZ*/, int32_t /*maxLayerZ*/,
+                                       bool /*useIdentityTransform*/,
+                                       ISurfaceComposer::Rotation /*rotation*/) {
+#if 0
     ATRACE_CALL();
 
     if (CC_UNLIKELY(display == 0)) return BAD_VALUE;
@@ -4722,11 +4723,14 @@ status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display, sp<GraphicBuf
     auto traverseLayers = std::bind(std::mem_fn(&SurfaceFlinger::traverseLayersInDisplay), this,
                                     device, minLayerZ, maxLayerZ, std::placeholders::_1);
     return captureScreenCommon(renderArea, traverseLayers, outBuffer, useIdentityTransform);
+#endif
+    return NO_ERROR;
 }
 
-status_t SurfaceFlinger::captureLayers(const sp<IBinder>& layerHandleBinder,
-                                       sp<GraphicBuffer>* outBuffer, const Rect& sourceCrop,
-                                       float frameScale, bool childrenOnly) {
+status_t SurfaceFlinger::captureLayers(const sp<IBinder>& /*layerHandleBinder*/,
+                                       sp<GraphicBuffer>* /*outBuffer*/, const Rect& /*sourceCrop*/,
+                                       float /*frameScale*/, bool /*childrenOnly*/) {
+#if 0
     ATRACE_CALL();
 
     class LayerRenderArea : public RenderArea {
@@ -4836,8 +4840,11 @@ status_t SurfaceFlinger::captureLayers(const sp<IBinder>& layerHandleBinder,
         });
     };
     return captureScreenCommon(renderArea, traverseLayers, outBuffer, false);
+#endif
+    return NO_ERROR;
 }
 
+#if 0
 status_t SurfaceFlinger::captureScreenCommon(RenderArea& renderArea,
                                              TraverseLayersFunction traverseLayers,
                                              sp<GraphicBuffer>* outBuffer,
@@ -4912,6 +4919,7 @@ status_t SurfaceFlinger::captureScreenCommon(RenderArea& renderArea,
 
     return result;
 }
+#endif
 
 void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea,
                                             TraverseLayersFunction traverseLayers, bool yswap,

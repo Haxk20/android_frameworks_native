@@ -87,6 +87,7 @@ public:
         }
 
         data.writeUint32(static_cast<uint32_t>(displays.size()));
+
         for (const auto& d : displays) {
             d.write(data);
         }
@@ -548,6 +549,14 @@ IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
 status_t BnSurfaceComposer::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    ALOGE("%s: code = %d", __func__, code);
+    if (code == CAPTURE_LAYERS || code == CAPTURE_SCREEN) {
+       if (code == CAPTURE_LAYERS)
+           ALOGE("%s: CAPTURE_LAYERS, %d", __func__, CAPTURE_LAYERS);
+       if (code == CAPTURE_SCREEN)
+           ALOGE("%s: CAPTURE_SCREEN, %d", __func__, CAPTURE_SCREEN);
+       return  BAD_VALUE;
+    }
     switch(code) {
         case CREATE_CONNECTION: {
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
@@ -570,6 +579,7 @@ status_t BnSurfaceComposer::onTransact(
             if (count > data.dataSize()) {
                 return BAD_VALUE;
             }
+
             ComposerState s;
             Vector<ComposerState> state;
             state.setCapacity(count);
@@ -595,6 +605,7 @@ status_t BnSurfaceComposer::onTransact(
             }
 
             uint32_t stateFlags = data.readUint32();
+
             setTransactionState(state, displays, stateFlags);
             return NO_ERROR;
         }
@@ -604,6 +615,8 @@ status_t BnSurfaceComposer::onTransact(
             return NO_ERROR;
         }
         case CAPTURE_SCREEN: {
+            ALOGE("%s: CAPTURE_SCREEN: not supported!", __func__);
+            return NO_ERROR;
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
             sp<IBinder> display = data.readStrongBinder();
             sp<GraphicBuffer> outBuffer;
@@ -626,6 +639,8 @@ status_t BnSurfaceComposer::onTransact(
             return NO_ERROR;
         }
         case CAPTURE_LAYERS: {
+            ALOGE("%s: CAPTURE_LAYERS: not supported!", __func__);
+            return NO_ERROR;
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
             sp<IBinder> layerHandleBinder = data.readStrongBinder();
             sp<GraphicBuffer> outBuffer;
