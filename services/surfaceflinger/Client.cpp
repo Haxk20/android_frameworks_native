@@ -157,16 +157,20 @@ status_t Client::createSurface(
         auto layerHandle = reinterpret_cast<Layer::Handle*>(parentHandle.get());
         parent = layerHandle->owner.promote();
         if (parent == nullptr) {
-            return NAME_NOT_FOUND;
+            ALOGE("%s: layerHandle->owner.promote() == nullptr", __func__);
+            goto skip;
+            //return NAME_NOT_FOUND;
         }
     }
+skip:
     if (parent == nullptr) {
         bool parentDied;
         parent = getParentLayer(&parentDied);
         // If we had a parent, but it died, we've lost all
         // our capabilities.
         if (parentDied) {
-            return NAME_NOT_FOUND;
+            ALOGE("%s: parentDied!", __func__);
+            //return NAME_NOT_FOUND;
         }
     }
 
