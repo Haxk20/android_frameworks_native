@@ -268,6 +268,10 @@ void HWComposer::destroyLayer(int32_t displayId, HWC2::Layer* layer) {
     }
 }
 
+uint32_t HWComposer::getFormat(int /*disp*/) const {
+    return HAL_PIXEL_FORMAT_RGB_565;
+}
+
 nsecs_t HWComposer::getRefreshTimestamp(int32_t displayId) const {
     // this returns the last refresh timestamp.
     // if the last one is not available, we estimate it based on

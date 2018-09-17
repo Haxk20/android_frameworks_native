@@ -44,7 +44,6 @@ LOCAL_MODULE := libsurfaceflinger
 LOCAL_C_INCLUDES := \
     hardware/interfaces/graphics/composer/2.1/utils/command-buffer/include \
     frameworks/native/vulkan/include \
-    frameworks/native/libs/vr/libpdx/private \
     external/vulkan-validation-layers/libs/vkjson \
     system/libhwbinder/fast_msgq/include \
 
@@ -67,9 +66,7 @@ LOCAL_CFLAGS += -fvisibility=hidden -Werror=format
 LOCAL_STATIC_LIBRARIES := \
     libhwcomposer-command-buffer \
     libtrace_proto \
-    libvkjson \
-    libvr_manager \
-    libvrflinger
+    libvkjson
 
 LOCAL_SHARED_LIBRARIES := \
     android.frameworks.vr.composer@1.0 \

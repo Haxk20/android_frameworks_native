@@ -86,6 +86,8 @@ public:
     // Destroy a previously created layer
     void destroyLayer(int32_t displayId, HWC2::Layer* layer);
 
+    uint32_t getFormat(int disp) const;
+
     // Asks the HAL what it can do
     status_t prepare(DisplayDevice& displayDevice);
 

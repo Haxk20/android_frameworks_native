@@ -24,6 +24,7 @@
 
 #include <ui/ColorSpace.h>
 #include <ui/DebugUtils.h>
+#include <ui/GraphicTypes.h>
 #include <ui/Rect.h>
 
 #include <utils/String8.h>
@@ -259,7 +260,7 @@ void GLES20RenderEngine::setupDimLayerBlending(int alpha) {
 
 #ifdef USE_HWC2
 void GLES20RenderEngine::setColorMode(android_color_mode mode) {
-    ALOGV("setColorMode: %s (0x%x)", decodeColorMode(mode).c_str(), mode);
+    ALOGV("setColorMode: %s (0x%x)", decodeColorMode(static_cast<android::ui::ColorMode>(mode)).c_str(), mode);
 
     if (mColorMode == mode) return;
 

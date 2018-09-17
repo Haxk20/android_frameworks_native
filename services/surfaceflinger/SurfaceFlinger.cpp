@@ -37,8 +37,6 @@
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
 
-#include <dvr/vr_flinger.h>
-
 #include <ui/DebugUtils.h>
 #include <ui/DisplayInfo.h>
 #include <ui/DisplayStatInfo.h>
@@ -102,6 +100,7 @@ extern "C" EGLAPI const char* eglQueryStringImplementationANDROID(EGLDisplay dpy
 
 namespace android {
 
+using namespace android::ui;
 using namespace android::hardware::configstore;
 using namespace android::hardware::configstore::V1_0;
 
@@ -189,7 +188,6 @@ SurfaceFlinger::SurfaceFlinger()
         mTotalTime(0),
         mLastSwapTime(0),
         mNumLayers(0),
-        mVrFlingerRequestsDisplay(false),
         mMainThreadId(std::this_thread::get_id()),
         mComposerSequenceId(0)
 {
@@ -392,11 +390,11 @@ void SurfaceFlinger::bootFinished()
     if (window != 0) {
         window->linkToDeath(static_cast<IBinder::DeathRecipient*>(this));
     }
-
+/*
     if (mVrFlinger) {
       mVrFlinger->OnBootFinished();
     }
-
+*/
     // stop boot animation
     // formerly we would just kill the process, but we now ask it to exit so it
     // can choose where to stop the animation.
@@ -625,7 +623,7 @@ void SurfaceFlinger::init() {
     // make the default display GLContext current so that we can create textures
     // when creating Layers (which may happens before we render something)
     getDefaultDisplayDeviceLocked()->makeCurrent(mEGLDisplay, mEGLContext);
-
+#if 0
     if (useVrFlinger) {
         auto vrFlingerRequestDisplayCallback = [this] (bool requestDisplay) {
             // This callback is called from the vr flinger dispatch thread. We
@@ -647,7 +645,7 @@ void SurfaceFlinger::init() {
             ALOGE("Failed to start vrflinger");
         }
     }
-
+#endif
     mEventControlThread = new EventControlThread(this);
     mEventControlThread->run("EventControl", PRIORITY_URGENT_DISPLAY);
 
@@ -922,7 +920,7 @@ status_t SurfaceFlinger::setActiveConfig(const sp<IBinder>& display, int mode) {
     return NO_ERROR;
 }
 status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
-        Vector<android_color_mode_t>* outColorModes) {
+        Vector<android::ui::ColorMode>* outColorModes) {
     if ((outColorModes == nullptr) || (display.get() == nullptr)) {
         return BAD_VALUE;
     }
@@ -943,7 +941,7 @@ status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
         return type;
     }
 
-    std::vector<android_color_mode_t> modes;
+    std::vector<android::ui::ColorMode> modes;
     {
         ConditionalLock _l(mStateLock,
                 std::this_thread::get_id() != mMainThreadId);
@@ -955,18 +953,18 @@ status_t SurfaceFlinger::getDisplayColorModes(const sp<IBinder>& display,
     return NO_ERROR;
 }
 
-android_color_mode_t SurfaceFlinger::getActiveColorMode(const sp<IBinder>& display) {
+android::ui::ColorMode SurfaceFlinger::getActiveColorMode(const sp<IBinder>& display) {
     sp<const DisplayDevice> device(getDisplayDevice(display));
     if (device != nullptr) {
         return device->getActiveColorMode();
     }
-    return static_cast<android_color_mode_t>(BAD_VALUE);
+    return static_cast<android::ui::ColorMode>(BAD_VALUE);
 }
 
 void SurfaceFlinger::setActiveColorModeInternal(const sp<DisplayDevice>& hw,
-        android_color_mode_t mode) {
+        android::ui::ColorMode mode) {
     int32_t type = hw->getDisplayType();
-    android_color_mode_t currentMode = hw->getActiveColorMode();
+    android::ui::ColorMode currentMode = hw->getActiveColorMode();
 
     if (mode == currentMode) {
         return;
@@ -986,20 +984,20 @@ void SurfaceFlinger::setActiveColorModeInternal(const sp<DisplayDevice>& hw,
 
 
 status_t SurfaceFlinger::setActiveColorMode(const sp<IBinder>& display,
-        android_color_mode_t colorMode) {
+        android::ui::ColorMode colorMode) {
     class MessageSetActiveColorMode: public MessageBase {
         SurfaceFlinger& mFlinger;
         sp<IBinder> mDisplay;
-        android_color_mode_t mMode;
+        android::ui::ColorMode mMode;
     public:
         MessageSetActiveColorMode(SurfaceFlinger& flinger, const sp<IBinder>& disp,
-                               android_color_mode_t mode) :
+                               android::ui::ColorMode mode) :
             mFlinger(flinger), mDisplay(disp) { mMode = mode; }
         virtual bool handler() {
-            Vector<android_color_mode_t> modes;
+            Vector<android::ui::ColorMode> modes;
             mFlinger.getDisplayColorModes(mDisplay, &modes);
             bool exists = std::find(std::begin(modes), std::end(modes), mMode) != std::end(modes);
-            if (mMode < 0 || !exists) {
+            if (static_cast<int>(mMode) < 0 || !exists) {
                 ALOGE("Attempt to set invalid active color mode %s (%d) for display %p",
                       decodeColorMode(mMode).c_str(), mMode, mDisplay.get());
                 return true;
@@ -1319,6 +1317,7 @@ void SurfaceFlinger::resetDisplayState() {
 }
 
 void SurfaceFlinger::updateVrFlinger() {
+#if 0
     if (!mVrFlinger)
         return;
     bool vrFlingerRequestsDisplay = mVrFlingerRequestsDisplay;
@@ -1338,11 +1337,9 @@ void SurfaceFlinger::updateVrFlinger() {
 
     int currentDisplayPowerMode = getDisplayDeviceLocked(
             mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY])->getPowerMode();
-
     if (!vrFlingerRequestsDisplay) {
         mVrFlinger->SeizeDisplayOwnership();
     }
-
     resetDisplayState();
     mHwc.reset();  // Delete the current instance before creating the new one
     mHwc.reset(new HWComposer(
@@ -1351,7 +1348,6 @@ void SurfaceFlinger::updateVrFlinger() {
 
     LOG_ALWAYS_FATAL_IF(!mHwc->getComposer()->isRemote(),
             "Switched to non-remote hardware composer");
-
     if (vrFlingerRequestsDisplay) {
         mVrFlinger->GrantDisplayOwnership();
     } else {
@@ -1377,6 +1373,7 @@ void SurfaceFlinger::updateVrFlinger() {
 
     android_atomic_or(1, &mRepaintEverything);
     setTransactionFlags(eDisplayTransactionNeeded);
+#endif
 }
 
 void SurfaceFlinger::onMessageReceived(int32_t what) {
@@ -1883,7 +1880,7 @@ void SurfaceFlinger::setUpHWComposer() {
         }
 
         if (hasWideColorDisplay) {
-            android_color_mode newColorMode;
+            android::ui::ColorMode newColorMode;
             android_dataspace newDataSpace = HAL_DATASPACE_V0_SRGB;
 
             for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
@@ -1892,7 +1889,7 @@ void SurfaceFlinger::setUpHWComposer() {
                       layer->getName().string(), dataspaceDetails(layer->getDataSpace()).c_str(),
                       layer->getDataSpace(), dataspaceDetails(newDataSpace).c_str(), newDataSpace);
             }
-            newColorMode = pickColorMode(newDataSpace);
+            newColorMode = static_cast<android::ui::ColorMode>(pickColorMode(newDataSpace));
 
             setActiveColorModeInternal(displayDevice, newColorMode);
         }
@@ -2199,10 +2196,11 @@ void SurfaceFlinger::processDisplayChangesLocked() {
                     bool useWideColorMode = hasWideColorDisplay;
                     if (state.isMainDisplay()) {
                         bool hasWideColorModes = false;
-                        std::vector<android_color_mode_t> modes =
+                        std::vector<android::ui::ColorMode> modes =
                                 getHwComposer().getColorModes(state.type);
-                        for (android_color_mode_t colorMode : modes) {
-                            switch (colorMode) {
+                        for (android::ui::ColorMode colorMode : modes) {
+                            int color_mode = static_cast<int>(colorMode);
+                            switch (color_mode) {
                                 case HAL_COLOR_MODE_DISPLAY_P3:
                                 case HAL_COLOR_MODE_ADOBE_RGB:
                                 case HAL_COLOR_MODE_DCI_P3:
@@ -2214,16 +2212,17 @@ void SurfaceFlinger::processDisplayChangesLocked() {
                         }
                         useWideColorMode = hasWideColorModes && hasWideColorDisplay;
                     }
+                    //int32_t fmt = PIXEL_FORMAT_RGB_565;
 
                     sp<DisplayDevice> hw =
-                            new DisplayDevice(this, state.type, hwcId, state.isSecure, display,
+                            new DisplayDevice(this, state.type, hwcId/*, mHwc->getFormat(hwcId) static_cast<android::PixelFormat>(fmt)*/, state.isSecure, display,
                                               dispSurface, producer, mRenderEngine->getEGLConfig(),
                                               useWideColorMode);
 
                     if (state.isMainDisplay()) {
-                        android_color_mode defaultColorMode = HAL_COLOR_MODE_NATIVE;
+                        ColorMode defaultColorMode = static_cast<ColorMode>(HAL_COLOR_MODE_NATIVE);
                         if (useWideColorMode) {
-                            defaultColorMode = HAL_COLOR_MODE_SRGB;
+                            defaultColorMode = static_cast<ColorMode>(HAL_COLOR_MODE_SRGB);
                         }
                         setActiveColorModeInternal(hw, defaultColorMode);
                         hw->setCompositionDataSpace(HAL_DATASPACE_UNKNOWN);
@@ -2481,7 +2480,7 @@ void SurfaceFlinger::computeVisibleRegions(const sp<const DisplayDevice>& displa
 
                 // compute the opaque region
                 const int32_t layerOrientation = tr.getOrientation();
-                if (s.alpha == 1.0f && !translucent &&
+                if (s.color.a == 1.0f && !translucent &&
                         ((layerOrientation & Transform::ROT_INVALID) == false)) {
                     // the opaque region is the layer's footprint
                     opaqueRegion = visibleRegion;
@@ -2682,7 +2681,7 @@ bool SurfaceFlinger::doComposeSurfaces(
 
 #ifdef USE_HWC2
         mRenderEngine->setWideColor(displayDevice->getWideColorSupport());
-        mRenderEngine->setColorMode(displayDevice->getActiveColorMode());
+        mRenderEngine->setColorMode(static_cast<android_color_mode>(displayDevice->getActiveColorMode()));
 #endif
         if (!displayDevice->makeCurrent(mEGLDisplay, mEGLContext)) {
             ALOGW("DisplayDevice::makeCurrent failed. Aborting surface composition for display %s",
@@ -2769,7 +2768,7 @@ bool SurfaceFlinger::doComposeSurfaces(
                     case HWC2::Composition::SolidColor: {
                         const Layer::State& state(layer->getDrawingState());
                         if (layer->getClearClientTarget(hwcId) && !firstLayer &&
-                                layer->isOpaque(state) && (state.alpha == 1.0f)
+                                layer->isOpaque(state) && (state.color.a == 1.0f)
                                 && hasClientComposition) {
                             // never clear the very first layer since we're
                             // guaranteed the FB is already cleared
@@ -3178,7 +3177,7 @@ uint32_t SurfaceFlinger::setClientStateLocked(
 status_t SurfaceFlinger::createLayer(
         const String8& name,
         const sp<Client>& client,
-        uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,
+        uint32_t w, uint32_t h, int format, uint32_t flags,
         uint32_t windowType, uint32_t ownerUid, sp<IBinder>* handle,
         sp<IGraphicBufferProducer>* gbp, sp<Layer>* parent)
 {
@@ -3200,7 +3199,7 @@ status_t SurfaceFlinger::createLayer(
                     uniqueName, w, h, flags, format,
                     handle, gbp, &layer);
             break;
-        case ISurfaceComposerClient::eFXSurfaceDim:
+        case ISurfaceComposerClient::eFXSurfaceColor:
             result = createDimLayer(client,
                     uniqueName, w, h, flags,
                     handle, gbp, &layer);
@@ -3258,7 +3257,7 @@ String8 SurfaceFlinger::getUniqueLayerName(const String8& name)
 }
 
 status_t SurfaceFlinger::createNormalLayer(const sp<Client>& client,
-        const String8& name, uint32_t w, uint32_t h, uint32_t flags, PixelFormat& format,
+        const String8& name, uint32_t w, uint32_t h, uint32_t flags, int format,
         sp<IBinder>* handle, sp<IGraphicBufferProducer>* gbp, sp<Layer>* outLayer)
 {
     // initialize the surfaces
@@ -3737,12 +3736,12 @@ void SurfaceFlinger::dumpWideColorInfo(String8& result) const {
         }
 
         result.appendFormat("Display %d color modes:\n", hwcId);
-        std::vector<android_color_mode_t> modes = getHwComposer().getColorModes(hwcId);
+        std::vector<android::ui::ColorMode> modes = getHwComposer().getColorModes(hwcId);
         for (auto&& mode : modes) {
             result.appendFormat("    %s (%d)\n", decodeColorMode(mode).c_str(), mode);
         }
 
-        android_color_mode_t currentMode = displayDevice->getActiveColorMode();
+        android::ui::ColorMode currentMode = displayDevice->getActiveColorMode();
         result.appendFormat("    Current color mode: %s (%d)\n",
                             decodeColorMode(currentMode).c_str(), currentMode);
     }
@@ -3916,6 +3915,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
     const GraphicBufferAllocator& alloc(GraphicBufferAllocator::get());
     alloc.dump(result);
 
+#if 0
     /*
      * Dump VrFlinger state if in use.
      */
@@ -3924,6 +3924,7 @@ void SurfaceFlinger::dumpAllLocked(const Vector<String16>& args, size_t& index,
         result.append(mVrFlinger->Dump().c_str());
         result.append("\n");
     }
+#endif
 }
 
 const Vector< sp<Layer> >&
@@ -4271,136 +4272,19 @@ static status_t getWindowBuffer(ANativeWindow* window, uint32_t requestedWidth,
     return NO_ERROR;
 }
 
-status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display,
-        const sp<IGraphicBufferProducer>& producer,
-        Rect sourceCrop, uint32_t reqWidth, uint32_t reqHeight,
-        int32_t minLayerZ, int32_t maxLayerZ,
-        bool useIdentityTransform, ISurfaceComposer::Rotation rotation) {
-    ATRACE_CALL();
-
-    if (CC_UNLIKELY(display == 0))
-        return BAD_VALUE;
-
-    if (CC_UNLIKELY(producer == 0))
-        return BAD_VALUE;
-
-    // if we have secure windows on this display, never allow the screen capture
-    // unless the producer interface is local (i.e.: we can take a screenshot for
-    // ourselves).
-    bool isLocalScreenshot = IInterface::asBinder(producer)->localBinder();
-
-    // Convert to surfaceflinger's internal rotation type.
-    Transform::orientation_flags rotationFlags;
-    switch (rotation) {
-        case ISurfaceComposer::eRotateNone:
-            rotationFlags = Transform::ROT_0;
-            break;
-        case ISurfaceComposer::eRotate90:
-            rotationFlags = Transform::ROT_90;
-            break;
-        case ISurfaceComposer::eRotate180:
-            rotationFlags = Transform::ROT_180;
-            break;
-        case ISurfaceComposer::eRotate270:
-            rotationFlags = Transform::ROT_270;
-            break;
-        default:
-            rotationFlags = Transform::ROT_0;
-            ALOGE("Invalid rotation passed to captureScreen(): %d\n", rotation);
-            break;
-    }
-
-    { // Autolock scope
-        Mutex::Autolock lock(mStateLock);
-        sp<const DisplayDevice> displayDevice(getDisplayDeviceLocked(display));
-        updateDimensionsLocked(displayDevice, rotationFlags, &reqWidth, &reqHeight);
-    }
-
-    // create a surface (because we're a producer, and we need to
-    // dequeue/queue a buffer)
-    sp<Surface> surface = new Surface(producer, false);
-
-    // Put the screenshot Surface into async mode so that
-    // Layer::headFenceHasSignaled will always return true and we'll latch the
-    // first buffer regardless of whether or not its acquire fence has
-    // signaled. This is needed to avoid a race condition in the rotation
-    // animation. See b/30209608
-    surface->setAsyncMode(true);
-
-    ANativeWindow* window = surface.get();
-
-    status_t result = native_window_api_connect(window, NATIVE_WINDOW_API_EGL);
-    if (result != NO_ERROR) {
-        return result;
-    }
-    WindowDisconnector disconnector(window, NATIVE_WINDOW_API_EGL);
-
-    ANativeWindowBuffer* buffer = nullptr;
-    result = getWindowBuffer(window, reqWidth, reqHeight, hasWideColorDisplay,
-                                      getRenderEngine().usesWideColor(), &buffer);
-    if (result != NO_ERROR) {
-        return result;
-    }
-
-    // This mutex protects syncFd and captureResult for communication of the return values from the
-    // main thread back to this Binder thread
-    std::mutex captureMutex;
-    std::condition_variable captureCondition;
-    std::unique_lock<std::mutex> captureLock(captureMutex);
-    int syncFd = -1;
-    std::optional<status_t> captureResult;
-
-    sp<LambdaMessage> message = new LambdaMessage([&]() {
-        // If there is a refresh pending, bug out early and tell the binder thread to try again
-        // after the refresh.
-        if (mRefreshPending) {
-            ATRACE_NAME("Skipping screenshot for now");
-            std::unique_lock<std::mutex> captureLock(captureMutex);
-            captureResult = std::make_optional<status_t>(EAGAIN);
-            captureCondition.notify_one();
-            return;
-        }
-
-        status_t result = NO_ERROR;
-        int fd = -1;
-        {
-            Mutex::Autolock _l(mStateLock);
-            sp<const DisplayDevice> device(getDisplayDeviceLocked(display));
-            result = captureScreenImplLocked(device, buffer, sourceCrop, reqWidth, reqHeight,
-                                             minLayerZ, maxLayerZ, useIdentityTransform,
-                                             rotationFlags, isLocalScreenshot, &fd);
-        }
-
-        {
-            std::unique_lock<std::mutex> captureLock(captureMutex);
-            syncFd = fd;
-            captureResult = std::make_optional<status_t>(result);
-            captureCondition.notify_one();
-        }
-    });
-
-    result = postMessageAsync(message);
-    if (result == NO_ERROR) {
-        captureCondition.wait(captureLock, [&]() { return captureResult; });
-        while (*captureResult == EAGAIN) {
-            captureResult.reset();
-            result = postMessageAsync(message);
-            if (result != NO_ERROR) {
-                return result;
-            }
-            captureCondition.wait(captureLock, [&]() { return captureResult; });
-        }
-        result = *captureResult;
-    }
-
-    if (result == NO_ERROR) {
-        // queueBuffer takes ownership of syncFd
-        result = window->queueBuffer(window, buffer, syncFd);
-    }
-
-    return result;
+status_t SurfaceFlinger::captureScreen(const sp<IBinder>& /*display*/,
+        sp<GraphicBuffer>* /*outBuffer*/,
+        Rect /*sourceCrop*/, uint32_t /*reqWidth*/, uint32_t /*reqHeight*/,
+        int32_t /*minLayerZ*/, int32_t /*maxLayerZ*/,
+        bool /*useIdentityTransform*/, ISurfaceComposer::Rotation /*rotation*/) {
+    return -EINVAL;
 }
 
+status_t SurfaceFlinger::captureLayers(const sp<IBinder>& /*layerHandleBinder*/,
+                                       sp<GraphicBuffer>* /*outBuffer*/, const Rect& /*sourceCrop*/,
+                                       float /*frameScale*/, bool /*childrenOnly*/) {
+    return NO_ERROR;
+}
 
 void SurfaceFlinger::renderScreenImplLocked(
         const sp<const DisplayDevice>& hw,
@@ -4440,7 +4324,7 @@ void SurfaceFlinger::renderScreenImplLocked(
 
 #ifdef USE_HWC2
      engine.setWideColor(hw->getWideColorSupport());
-     engine.setColorMode(hw->getActiveColorMode());
+     engine.setColorMode(static_cast<android_color_mode>(hw->getActiveColorMode()));
 #endif
 
     // make sure to clear all GL error flags
@@ -4623,10 +4507,10 @@ void SurfaceFlinger::checkScreenshot(size_t w, size_t s, size_t h, void const* v
             if (layer->belongsToDisplay(hw->getLayerStack(), false) && state.z >= minLayerZ &&
                     state.z <= maxLayerZ) {
                 layer->traverseInZOrder(LayerVector::StateSet::Drawing, [&](Layer* layer) {
-                    ALOGE("%c index=%zu, name=%s, layerStack=%d, z=%d, visible=%d, flags=%x, alpha=%.3f",
+                    ALOGE("%c index=%zu, name=%s, layerStack=%d, z=%d, visible=%d, flags=%x",
                             layer->isVisible() ? '+' : '-',
                             i, layer->getName().string(), layer->getLayerStack(), state.z,
-                            layer->isVisible(), state.flags, state.alpha);
+                            layer->isVisible(), state.flags);
                     i++;
                 });
             }

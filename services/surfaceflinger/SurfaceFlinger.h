@@ -91,10 +91,6 @@ class EventControlThread;
 class VSyncSource;
 class InjectVSyncSource;
 
-namespace dvr {
-class VrFlinger;
-} // namespace dvr
-
 // ---------------------------------------------------------------------------
 
 enum {
@@ -403,12 +399,12 @@ private:
      * Layer management
      */
     status_t createLayer(const String8& name, const sp<Client>& client,
-            uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,
+            uint32_t w, uint32_t h, int format, uint32_t flags,
             uint32_t windowType, uint32_t ownerUid, sp<IBinder>* handle,
             sp<IGraphicBufferProducer>* gbp, sp<Layer>* parent);
 
     status_t createNormalLayer(const sp<Client>& client, const String8& name,
-            uint32_t w, uint32_t h, uint32_t flags, PixelFormat& format,
+            uint32_t w, uint32_t h, uint32_t flags, int format,
             sp<IBinder>* outHandle, sp<IGraphicBufferProducer>* outGbp,
             sp<Layer>* outLayer);
 
@@ -821,7 +817,6 @@ private:
     status_t CheckTransactCodeCredentials(uint32_t code);
 
 #ifdef USE_HWC2
-    std::unique_ptr<dvr::VrFlinger> mVrFlinger;
     std::atomic<bool> mVrFlingerRequestsDisplay;
     static bool useVrFlinger;
     std::thread::id mMainThreadId;

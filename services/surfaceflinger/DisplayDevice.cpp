@@ -88,7 +88,6 @@ DisplayDevice::DisplayDevice(
         const sp<SurfaceFlinger>& flinger,
         DisplayType type,
         int32_t hwcId,
-        int format,
         bool isSecure,
         const wp<IBinder>& displayToken,
         const sp<DisplaySurface>& displaySurface,
@@ -135,6 +134,7 @@ DisplayDevice::DisplayDevice(
 
     EGLSurface eglSurface;
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    int format = HAL_PIXEL_FORMAT_RGB_565;
     if (config == EGL_NO_CONFIG) {
 #ifdef USE_HWC2
         config = RenderEngine::chooseEglConfig(display, format,
