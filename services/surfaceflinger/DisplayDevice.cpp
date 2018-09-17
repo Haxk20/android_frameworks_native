@@ -483,7 +483,7 @@ android_color_transform_t DisplayDevice::getColorTransform() const {
 
 void DisplayDevice::setCompositionDataSpace(ui::Dataspace dataspace) {
     mCompositionDataSpace = dataspace;
-    ANativeWindow* const window = FramebufferNativeWindow();
+    ANativeWindow* const window = new FramebufferNativeWindow();
     native_window_set_buffers_data_space(window, static_cast<android_dataspace>(dataspace));
 }
 
@@ -550,18 +550,16 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
-//#ifdef STE_HARDWARE
-//    ANativeWindow* const window = new FramebufferNativeWindow();
-//#else
+#ifdef STE_HARDWARE
+    ANativeWindow* const window = new FramebufferNativeWindow();
+    mSurface->setNativeWindow(window);
+#else
     mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
     mSurface->setNativeWindow(window);
-//#endif
-    mDisplayWidth = 480; //mSurface->queryWidth();
-    mDisplayHeight = 800; //mSurface->queryHeight();
-    mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
-    eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
-    eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);
+#endif
+    mDisplayWidth = mSurface->queryWidth();
+    mDisplayHeight = mSurface->queryHeight();
 
     LOG_FATAL_IF(mDisplayWidth != newWidth,
                 "Unable to set new width to %d", newWidth);
@@ -676,7 +674,7 @@ void DisplayDevice::dump(String8& result) const {
     result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), "
                         "(%d:%d:%d:%d), orient=%2d (type=%08x), "
                         "flips=%u, isSecure=%d, powerMode=%d, activeConfig=%d, numLayers=%zu\n",
-                        mType, mHwcDisplayId, mLayerStack, mDisplayWidth, mDisplayHeight, window,
+                        mType, mHwcDisplayId, mLayerStack, mDisplayWidth, mDisplayHeight,
                         mSurface->queryRedSize(), mSurface->queryGreenSize(),
                         mSurface->queryBlueSize(), mSurface->queryAlphaSize(), mOrientation,
                         tr.getType(), getPageFlipCount(), mIsSecure, mPowerMode, mActiveConfig,
