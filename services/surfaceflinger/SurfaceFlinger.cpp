@@ -48,6 +48,11 @@
 #include <gui/Surface.h>
 
 #include <ui/GraphicBufferAllocator.h>
+
+#ifdef STE_HARDWARE
+#include <ui/FramebufferNativeWindow.h>
+#endif
+
 #include <ui/PixelFormat.h>
 #include <ui/UiConfig.h>
 
@@ -2290,8 +2295,9 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
     HdrCapabilities hdrCapabilities;
     getHwComposer().getHdrCapabilities(hwcId, &hdrCapabilities);
 
-    auto nativeWindowSurface = mCreateNativeWindowSurface(producer);
-    auto nativeWindow = nativeWindowSurface->getNativeWindow();
+    //auto nativeWindowSurface = mCreateNativeWindowSurface(producer);
+    //auto nativeWindow = nativeWindowSurface->getNativeWindow();
+    ANativeWindow* const nativeWindow = new FramebufferNativeWindow();
 
     /*
      * Create our display's surface
@@ -2299,7 +2305,7 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
     std::unique_ptr<RE::Surface> renderSurface = getRenderEngine().createSurface();
     renderSurface->setCritical(state.type == DisplayDevice::DISPLAY_PRIMARY);
     renderSurface->setAsync(state.type >= DisplayDevice::DISPLAY_VIRTUAL);
-    renderSurface->setNativeWindow(nativeWindow.get());
+    renderSurface->setNativeWindow(nativeWindow);
     const int displayWidth = renderSurface->queryWidth();
     const int displayHeight = renderSurface->queryHeight();
 
@@ -2311,7 +2317,7 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
     //   window's swap interval in eglMakeCurrent, so they'll override the
     //   interval we set here.
     if (state.type >= DisplayDevice::DISPLAY_VIRTUAL) {
-        nativeWindow->setSwapInterval(nativeWindow.get(), 0);
+        nativeWindow->setSwapInterval(nativeWindow, 0);
     }
 
     // virtual displays are always considered enabled
@@ -2325,9 +2331,11 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
                               getHwComposer().getSupportedPerFrameMetadata(hwcId),
                               hwcColorModes, initialPowerMode);
 
+#ifndef STE_HARDWARE
     if (maxFrameBufferAcquiredBuffers >= 3) {
         nativeWindowSurface->preallocateBuffers();
     }
+#endif
 
     ColorMode defaultColorMode = ColorMode::NATIVE;
     Dataspace defaultDataSpace = Dataspace::UNKNOWN;
