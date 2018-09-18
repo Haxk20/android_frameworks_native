@@ -83,6 +83,8 @@
 
 using namespace android::surfaceflinger;
 
+struct ANativeWindow;
+
 namespace android {
 
 // ---------------------------------------------------------------------------
@@ -519,6 +521,8 @@ private:
     uint32_t setDisplayStateLocked(const DisplayState& s);
     void setDestroyStateLocked(const ComposerState& composerState);
 
+    sp<ANativeWindow> createWindow();
+
     /* ------------------------------------------------------------------------
      * Layer management
      */
@@ -893,6 +897,12 @@ private:
     CreateNativeWindowSurfaceFunction mCreateNativeWindowSurface;
 
     SurfaceFlingerBE mBE;
+
+#ifdef STE_HARDWARE
+    bool mIsCreated;
+    sp<ANativeWindow> mNativeWindow;
+#endif
+
 };
 }; // namespace android
 

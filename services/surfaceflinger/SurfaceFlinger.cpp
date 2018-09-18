@@ -47,6 +47,11 @@
 #include <gui/LayerDebugInfo.h>
 #include <gui/Surface.h>
 
+ 
+#ifdef STE_HARDWARE
+#include <ui/FramebufferNativeWindow.h>
+#endif
+
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/PixelFormat.h>
 #include <ui/UiConfig.h>
@@ -240,7 +245,8 @@ SurfaceFlinger::SurfaceFlinger(SurfaceFlinger::SkipInitializationTag)
         mVrFlingerRequestsDisplay(false),
         mMainThreadId(std::this_thread::get_id()),
         mCreateBufferQueue(&BufferQueue::createBufferQueue),
-        mCreateNativeWindowSurface(&impl::NativeWindowSurface::create) {}
+        mCreateNativeWindowSurface(&impl::NativeWindowSurface::create),
+        mIsCreated(false) {}
 
 SurfaceFlinger::SurfaceFlinger() : SurfaceFlinger(SkipInitialization) {
     ALOGI("SurfaceFlinger is starting");
@@ -359,6 +365,15 @@ void SurfaceFlinger::onFirstRef()
 
 SurfaceFlinger::~SurfaceFlinger()
 {
+}
+
+sp<ANativeWindow> SurfaceFlinger::createWindow() {
+    if (!mIsCreated) {
+       mNativeWindow = new FramebufferNativeWindow();
+       mIsCreated = true;
+    }
+
+    return mNativeWindow;
 }
 
 void SurfaceFlinger::binderDied(const wp<IBinder>& /* who */)
@@ -2291,7 +2306,7 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
     getHwComposer().getHdrCapabilities(hwcId, &hdrCapabilities);
 
     auto nativeWindowSurface = mCreateNativeWindowSurface(producer);
-    auto nativeWindow = nativeWindowSurface->getNativeWindow();
+    auto nativeWindow = createWindow();
 
     /*
      * Create our display's surface
