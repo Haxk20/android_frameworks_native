@@ -34,9 +34,6 @@
 #include <ui/DebugUtils.h>
 #include <ui/DisplayInfo.h>
 #include <ui/PixelFormat.h>
-#ifdef STE_HARDWARE
-#include <ui/FramebufferNativeWindow.h>
-#endif
 
 #include <gui/Surface.h>
 
@@ -297,7 +294,6 @@ DisplayDevice::DisplayDevice(
     }
     mHdrCapabilities = HdrCapabilities(types, maxLuminance, maxAverageLuminance, minLuminance);
 
-
     // initialize the display orientation transform.
     setProjection(DisplayState::eOrientationDefault, mViewport, mFrame);
 }
@@ -483,7 +479,7 @@ android_color_transform_t DisplayDevice::getColorTransform() const {
 
 void DisplayDevice::setCompositionDataSpace(ui::Dataspace dataspace) {
     mCompositionDataSpace = dataspace;
-    ANativeWindow* const window = new FramebufferNativeWindow();
+    ANativeWindow* const window = mNativeWindow.get();
     native_window_set_buffers_data_space(window, static_cast<android_dataspace>(dataspace));
 }
 
@@ -550,12 +546,7 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
 
     mDisplaySurface->resizeBuffers(newWidth, newHeight);
 
-#ifdef STE_HARDWARE
-    ANativeWindow* const window = new FramebufferNativeWindow();
-#else
-    mNativeWindow = new Surface(producer, false);
     ANativeWindow* const window = mNativeWindow.get();
-#endif
     mSurface->setNativeWindow(window);
     mDisplayWidth = mSurface->queryWidth();
     mDisplayHeight = mSurface->queryHeight();
@@ -668,7 +659,7 @@ uint32_t DisplayDevice::getPrimaryDisplayOrientationTransform() {
 
 void DisplayDevice::dump(String8& result) const {
     const Transform& tr(mGlobalTransform);
-    ANativeWindow* const window = new FramebufferNativeWindow();
+    ANativeWindow* const window = mNativeWindow.get();
     result.appendFormat("+ DisplayDevice: %s\n", mDisplayName.string());
     result.appendFormat("   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p "
                         "(%d:%d:%d:%d), orient=%2d (type=%08x), "
