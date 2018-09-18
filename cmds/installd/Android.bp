@@ -3,6 +3,7 @@ cc_defaults {
 
     cflags: [
         "-Wall",
+        "-Wno-unused-parameter",
     ],
     srcs: [
         "CacheItem.cpp",

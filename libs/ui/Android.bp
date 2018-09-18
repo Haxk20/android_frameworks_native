@@ -20,7 +20,10 @@ cc_library_shared {
     },
 
     clang: true,
-    cflags: ["-DEGL_NEEDS_HANDLE"],
+    cflags: [
+             "-DEGL_NEEDS_HANDLE",
+             "-Wno-unused-parameter", 
+    ],
     cppflags: [
         "-Weverything",
         "-Wno-unused-variable",
