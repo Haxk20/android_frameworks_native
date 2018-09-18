@@ -2,6 +2,7 @@ LIBNATIVEWINDOW {
   global:
     AHardwareBuffer_acquire;
     AHardwareBuffer_allocate;
+    AHardwareBuffer_createFromHandle; # vndk
     AHardwareBuffer_describe;
     AHardwareBuffer_getNativeHandle; # vndk
     AHardwareBuffer_lock;
@@ -15,7 +16,6 @@ LIBNATIVEWINDOW {
     ANativeWindow_acquire;
     ANativeWindow_cancelBuffer; # vndk
     ANativeWindow_dequeueBuffer; # vndk
-    ANativeWindow_getBuffersDataSpace; # introduced=28
     ANativeWindow_getFormat;
     ANativeWindow_getHeight;
     ANativeWindow_getWidth;
@@ -26,7 +26,7 @@ LIBNATIVEWINDOW {
     ANativeWindow_release;
     ANativeWindow_setAutoRefresh; # vndk
     ANativeWindow_setBufferCount; # vndk
-    ANativeWindow_setBuffersDataSpace; # introduced=28
+    ANativeWindow_setBufferDataSpace; # vndk
     ANativeWindow_setBuffersDimensions; # vndk
     ANativeWindow_setBuffersFormat; # vndk
     ANativeWindow_setBuffersGeometry;
