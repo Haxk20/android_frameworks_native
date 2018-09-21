@@ -17,6 +17,7 @@
 #ifndef ANDROID_BUFFERLAYERCONSUMER_H
 #define ANDROID_BUFFERLAYERCONSUMER_H
 
+#include <gui/BufferQueue.h>
 #include <gui/BufferQueueDefs.h>
 #include <gui/ConsumerBase.h>
 #include <gui/HdrMetadata.h>
@@ -29,6 +30,10 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
+
+#ifdef STE_HARDWARE
+#include <hardware/copybit.h>
+#endif
 
 namespace android {
 // ----------------------------------------------------------------------------
@@ -75,6 +80,11 @@ public:
     // images are to be streamed.
     BufferLayerConsumer(const sp<IGraphicBufferConsumer>& bq, RE::RenderEngine& engine,
                         uint32_t tex, Layer* layer);
+
+#ifdef STE_HARDWARE
+    // Method for closing copybit device while abandoning the surface
+    virtual ~BufferLayerConsumer();
+#endif
 
     // Sets the contents changed listener. This should be used instead of
     // ConsumerBase::setFrameAvailableListener().
@@ -177,6 +187,10 @@ public:
     // DEFAULT_USAGE_FLAGS to usage.
     status_t setConsumerUsageBits(uint64_t usage);
 
+#ifdef STE_HARDWARE
+    status_t convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf);
+#endif
+
 protected:
     // abandonLocked overrides the ConsumerBase method to clear
     // mCurrentTextureImage in addition to the ConsumerBase behavior.
@@ -185,6 +199,11 @@ protected:
     // dumpLocked overrides the ConsumerBase method to dump BufferLayerConsumer-
     // specific info in addition to the ConsumerBase behavior.
     virtual void dumpLocked(String8& result, const char* prefix) const;
+
+#ifdef STE_HARDWARE
+    // returns true if the slot still has the graphicBuffer in it.
+    virtual bool stillTracking(int slot, const sp<GraphicBuffer> graphicBuffer);
+#endif
 
     // acquireBufferLocked overrides the ConsumerBase method to update the
     // mImages array in addition to the ConsumerBase behavior.
@@ -232,6 +251,10 @@ private:
         // one yet, or the crop-rect has changed).
         status_t createIfNeeded(const Rect& imageCrop);
 
+#ifdef STE_HARDWARE
+        // converts buffer to a suitable color format
+        status_t convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf);
+#endif
         const sp<GraphicBuffer>& graphicBuffer() { return mGraphicBuffer; }
         const native_handle* graphicBufferHandle() {
             return mGraphicBuffer == nullptr ? nullptr : mGraphicBuffer->handle;
@@ -380,6 +403,18 @@ private:
     // that no buffer is bound to the texture. A call to setBufferCount will
     // reset mCurrentTexture to INVALID_BUFFER_SLOT.
     int mCurrentTexture;
+
+#ifdef STE_HARDWARE
+    // mBlitEngine is the handle to the copybit device which will be used in
+    // case color transform is needed before the EGL image is created.
+    copybit_device_t* mBlitEngine;
+
+    // mBlitSlots stores the buffers that have been allocated int the case
+    // of color transform. It is initialised to null pointer,s and gets
+    // filled in with the result of GLConsumer::updateAndReleaseLocked
+    sp<GraphicBuffer> mBlitSlots[6];
+    int mNextBlitSlot;
+#endif
 
     // A release that is pending on the receipt of a new release fence from
     // presentDisplay

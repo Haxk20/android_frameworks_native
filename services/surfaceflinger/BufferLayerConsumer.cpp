@@ -76,13 +76,39 @@ BufferLayerConsumer::BufferLayerConsumer(const sp<IGraphicBufferConsumer>& bq,
         mRE(engine),
         mTexName(tex),
         mLayer(layer),
-        mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT) {
+        mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
+#ifdef STE_HARDWARE
+        mNextBlitSlot(0)
+#endif
+{
     BLC_LOGV("BufferLayerConsumer");
 
     memcpy(mCurrentTransformMatrix, mtxIdentity.asArray(), sizeof(mCurrentTransformMatrix));
 
+#ifdef STE_HARDWARE
+    hw_module_t const* module;
+    mBlitEngine = 0;
+    if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
+        copybit_open(module, &mBlitEngine);
+    }
+    ALOGE_IF(!mBlitEngine, "\nCannot open copybit mBlitEngine=%p", mBlitEngine);
+
+    sp<ISurfaceComposer> composer(ComposerService::getComposerService());
+#endif
+
     mConsumer->setConsumerUsageBits(DEFAULT_USAGE_FLAGS);
 }
+
+#ifdef STE_HARDWARE
+BufferLayerConsumer::~BufferLayerConsumer() {
+    BLC_LOGV("~BufferLayerConsumer:");
+    abandon();
+
+    if (mBlitEngine) {
+        copybit_close(mBlitEngine);
+    }
+}
+#endif
 
 status_t BufferLayerConsumer::setDefaultBufferSize(uint32_t w, uint32_t h) {
     Mutex::Autolock lock(mMutex);
@@ -288,6 +314,24 @@ bool BufferLayerConsumer::canUseImageCrop(const Rect& crop) const {
     return mRE.supportsImageCrop() && crop.left == 0 && crop.top == 0;
 }
 
+#ifdef STE_HARDWARE
+bool BufferLayerConsumer::stillTracking(int slot,
+        const sp<GraphicBuffer> graphicBuffer) {
+    if (slot < 0 || slot >= BufferQueue::NUM_BUFFER_SLOTS) {
+        return false;
+    }
+
+    // For NovaThor check whether the buffer should not be the
+    // case for BlitSlot that is, if it is a film.
+    //
+    // While going to work this should fix random reboots,
+    // because stillTracking method will operate as it should.
+    return ((mSlots[slot].mGraphicBuffer != NULL && mSlots[slot].mGraphicBuffer->handle == graphicBuffer->handle) ||
+            (mBlitSlots[0] != NULL && mBlitSlots[0]->handle == graphicBuffer->handle) ||
+            (mBlitSlots[1] != NULL && mBlitSlots[1]->handle == graphicBuffer->handle));
+}
+#endif
+
 status_t BufferLayerConsumer::updateAndReleaseLocked(const BufferItem& item,
                                                      PendingRelease* pendingRelease) {
     status_t err = NO_ERROR;
@@ -366,6 +410,86 @@ status_t BufferLayerConsumer::bindTextureImageLocked() {
     }
 
     const Rect& imageCrop = canUseImageCrop(mCurrentCrop) ? mCurrentCrop : Rect::EMPTY_RECT;
+
+#ifdef STE_HARDWARE
+    int res_ = 0;
+
+    sp<GraphicBuffer> textureBuffer;
+    if (mCurrentTexture == BufferQueue::INVALID_BUFFER_SLOT) {
+        res_ = 1;
+	goto convert_err;
+    }
+    if (mCurrentTexture >= 6) {
+        res_ = -1;
+	goto convert_err;
+    }
+
+    if (mSlots[mCurrentTexture].mGraphicBuffer == NULL) {
+        res_ = 2;
+	goto convert_err;
+    }
+
+    if (mSlots[mCurrentTexture].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCBCR42XMBN
+     || mSlots[mCurrentTexture].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCbCr_420_P) {
+        if (mNextBlitSlot < 0) {
+            res_ = 3; goto convert_err;
+        }
+        if (mSlots[mCurrentTexture].mGraphicBuffer != NULL && mBlitSlots[mNextBlitSlot] != NULL) {
+            sp<GraphicBuffer> srcBuf = mSlots[mCurrentTexture].mGraphicBuffer;
+            sp<GraphicBuffer> dstBuf = mBlitSlots[mNextBlitSlot];
+            if (srcBuf->getWidth() != dstBuf->getWidth() || srcBuf->getHeight() != dstBuf->getHeight()) {
+                mBlitSlots[mNextBlitSlot] = NULL;
+            }
+        }
+
+        /* allocate convert buffer if needed */
+        if (mBlitSlots[mNextBlitSlot] == NULL) {
+            status_t res;
+            sp<GraphicBuffer> srcBuf = mSlots[mCurrentTexture].mGraphicBuffer;
+            sp<GraphicBuffer> dstBuf = new GraphicBuffer(srcBuf->getWidth(),
+                                                         srcBuf->getHeight(),
+                                                         PIXEL_FORMAT_RGBA_8888,
+                                                         srcBuf->getUsage());
+
+            if (dstBuf == 0) {
+                BLC_LOGE("updateAndRelease: createGraphicBuffer failed");
+                return NO_MEMORY;
+            }
+
+            res = dstBuf->initCheck();
+
+            if (res != NO_ERROR) {
+                BLC_LOGW("updateAndRelease: createGraphicBuffer error=%#04x", res);
+            }
+
+            mBlitSlots[mNextBlitSlot] = dstBuf;
+        }
+
+        /* convert buffer */
+        if (convert(mSlots[mCurrentTexture].mGraphicBuffer, mBlitSlots[mNextBlitSlot]) != OK) {
+            BLC_LOGE("updateAndRelease: convert failed");
+            return UNKNOWN_ERROR;
+        }
+
+        if (mBlitSlots[mNextBlitSlot] == NULL) {
+            res_ = 4;
+            goto convert_err;
+        }
+
+        textureBuffer = mBlitSlots[mNextBlitSlot];
+        mCurrentTextureImage = new Image(textureBuffer, mRE);
+
+        if (mCurrentTextureImage == NULL) {
+            res_ = 5;
+            goto convert_err;
+        }
+
+        mNextBlitSlot = (mNextBlitSlot + 1) % BufferQueue::NUM_BLIT_BUFFER_SLOTS;
+    }
+convert_err:
+    if (res_ != 0)
+       BLC_LOGE("convert error status = %d", res_);
+#endif
     status_t err = mCurrentTextureImage->createIfNeeded(imageCrop);
     if (err != NO_ERROR) {
         BLC_LOGW("bindTextureImage: can't create image on slot=%d", mCurrentTexture);
@@ -605,6 +729,58 @@ void BufferLayerConsumer::dumpLocked(String8& result, const char* prefix) const 
 
     ConsumerBase::dumpLocked(result, prefix);
 }
+
+#ifdef STE_HARDWARE
+status_t BufferLayerConsumer::convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf) {
+    /* For some reason mBlitEngine is not being initialized in
+       the constructor so we init' it before we use it. */
+    hw_module_t const* module;
+    if (mBlitEngine == NULL) {
+        if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
+            copybit_open(module, &mBlitEngine);
+        }
+    }
+
+    copybit_image_t dstImg;
+    dstImg.w = dstBuf->getWidth();
+    dstImg.h = dstBuf->getHeight();
+    dstImg.format = dstBuf->getPixelFormat();
+    dstImg.handle = (native_handle_t*) dstBuf->getNativeBuffer()->handle;
+
+    copybit_image_t srcImg;
+    srcImg.w = srcBuf->getWidth();
+    srcImg.h = srcBuf->getHeight();
+    srcImg.format = srcBuf->getPixelFormat();
+    srcImg.base = NULL;
+    srcImg.handle = (native_handle_t*) srcBuf->getNativeBuffer()->handle;
+
+    copybit_rect_t dstCrop;
+    dstCrop.l = 0;
+    dstCrop.t = 0;
+    dstCrop.r = dstBuf->getWidth();
+    dstCrop.b = dstBuf->getHeight();
+
+    copybit_rect_t srcCrop;
+    srcCrop.l = 0;
+    srcCrop.t = 0;
+    srcCrop.r = srcBuf->getWidth();
+    srcCrop.b = srcBuf->getHeight();
+
+    region_iterator clip(Region(Rect(dstCrop.r, dstCrop.b)));
+    mBlitEngine->set_parameter(mBlitEngine, COPYBIT_TRANSFORM, 0);
+    mBlitEngine->set_parameter(mBlitEngine, COPYBIT_PLANE_ALPHA, 0xFF);
+    mBlitEngine->set_parameter(mBlitEngine, COPYBIT_DITHER, COPYBIT_ENABLE);
+
+    int err = mBlitEngine->stretch(
+            mBlitEngine, &dstImg, &srcImg, &dstCrop, &srcCrop, &clip);
+    if (err != 0) {
+        ALOGE("\nError: Blit stretch operation failed (err:%d)\n", err);
+        /* return ok to not block decoding. But why this error ? */
+        return OK;
+    }
+    return OK;
+}
+#endif
 
 BufferLayerConsumer::Image::Image(sp<GraphicBuffer> graphicBuffer, RE::RenderEngine& engine)
       : mGraphicBuffer(graphicBuffer),
