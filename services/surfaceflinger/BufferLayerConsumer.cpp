@@ -245,11 +245,6 @@ status_t BufferLayerConsumer::updateTexImage(BufferRejecter* rejecter, const Dis
     return err;
 }
 
-status_t BufferLayerConsumer::bindTextureImage() {
-    Mutex::Autolock lock(mMutex);
-    return bindTextureImageLocked();
-}
-
 void BufferLayerConsumer::setReleaseFence(const sp<Fence>& fence) {
     if (!fence->isValid()) {
         return;
@@ -282,11 +277,6 @@ bool BufferLayerConsumer::releasePendingBuffer() {
     }
     mPendingRelease = PendingRelease();
     return true;
-}
-
-sp<Fence> BufferLayerConsumer::getPrevFinalReleaseFence() const {
-    Mutex::Autolock lock(mMutex);
-    return ConsumerBase::mPrevFinalReleaseFence;
 }
 
 status_t BufferLayerConsumer::acquireBufferLocked(BufferItem* item, nsecs_t presentWhen,
