@@ -25,14 +25,15 @@
 
 #include <cutils/native_handle.h>
 
-#include <ui/PixelFormat.h>
-
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/Mutex.h>
 #include <utils/Singleton.h>
 
+#include <ui/PixelFormat.h>
+
 #include <hardware/gralloc.h>
+
 
 namespace android {
 // ---------------------------------------------------------------------------
@@ -79,7 +80,7 @@ private:
         uint32_t stride;
         PixelFormat format;
         uint32_t layerCount;
-        uint32_t usage;
+        uint64_t usage;
         size_t size;
     };
 
