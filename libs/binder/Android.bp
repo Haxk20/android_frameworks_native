@@ -79,11 +79,15 @@ cc_library {
     cflags: [
         "-Wall",
         "-Wextra",
-        "-Werror",
     ],
     product_variables: {
         binder32bit: {
             cflags: ["-DBINDER_IPC_32BIT=1"],
+        },
+        lineage: {
+            disable_ashmem_tracking: {
+                cflags: ["-DDISABLE_ASHMEM_TRACKING"],
+            },
         },
     },
 

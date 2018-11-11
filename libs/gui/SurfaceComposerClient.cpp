@@ -940,6 +940,12 @@ status_t SurfaceComposerClient::getHdrCapabilities(const sp<IBinder>& display,
 
 // ----------------------------------------------------------------------------
 
+#ifndef FORCE_SCREENSHOT_CPU_PATH
+#define SS_CPU_CONSUMER false
+#else
+#define SS_CPU_CONSUMER true
+#endif
+
 status_t ScreenshotClient::capture(
         const sp<IBinder>& display,
         const sp<IGraphicBufferProducer>& producer,
@@ -948,7 +954,8 @@ status_t ScreenshotClient::capture(
     sp<ISurfaceComposer> s(ComposerService::getComposerService());
     if (s == NULL) return NO_INIT;
     return s->captureScreen(display, producer, sourceCrop,
-            reqWidth, reqHeight, minLayerZ, maxLayerZ, useIdentityTransform);
+            reqWidth, reqHeight, minLayerZ, maxLayerZ, useIdentityTransform,
+            ISurfaceComposer::eRotateNone, SS_CPU_CONSUMER);
 }
 
 status_t ScreenshotClient::captureToBuffer(const sp<IBinder>& display,
@@ -968,7 +975,7 @@ status_t ScreenshotClient::captureToBuffer(const sp<IBinder>& display,
 
     status_t ret = s->captureScreen(display, producer, sourceCrop, reqWidth, reqHeight,
             minLayerZ, maxLayerZ, useIdentityTransform,
-            static_cast<ISurfaceComposer::Rotation>(rotation));
+            static_cast<ISurfaceComposer::Rotation>(rotation), SS_CPU_CONSUMER);
     if (ret != NO_ERROR) {
         return ret;
     }
@@ -1013,7 +1020,7 @@ status_t ScreenshotClient::update(const sp<IBinder>& display,
 
     status_t err = s->captureScreen(display, mProducer, sourceCrop,
             reqWidth, reqHeight, minLayerZ, maxLayerZ, useIdentityTransform,
-            static_cast<ISurfaceComposer::Rotation>(rotation));
+            static_cast<ISurfaceComposer::Rotation>(rotation), SS_CPU_CONSUMER);
 
     if (err == NO_ERROR) {
         err = mCpuConsumer->lockNextBuffer(&mBuffer);
