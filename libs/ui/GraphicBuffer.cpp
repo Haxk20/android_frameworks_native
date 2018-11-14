@@ -69,7 +69,7 @@ GraphicBuffer::GraphicBuffer(uint32_t inWidth, uint32_t inHeight,
     : GraphicBuffer()
 {
     mInitCheck = initWithSize(inWidth, inHeight, inFormat, inLayerCount,
-            usage);
+            usage, std::move(requestorName));
 }
 
 // deprecated
@@ -103,9 +103,7 @@ GraphicBuffer::~GraphicBuffer()
 void GraphicBuffer::free_handle()
 {
     if (mOwner == ownHandle) {
-        mBufferMapper.unregisterBuffer(handle);
-        native_handle_close(handle);
-        native_handle_delete(const_cast<native_handle*>(handle));
+        mBufferMapper.freeBuffer(handle);
     } else if (mOwner == ownData) {
         GraphicBufferAllocator& allocator(GraphicBufferAllocator::get());
         allocator.free(handle);
@@ -150,8 +148,7 @@ status_t GraphicBuffer::reallocate(uint32_t inWidth, uint32_t inHeight,
         allocator.free(handle);
         handle = 0;
     }
-    return initWithSize(inWidth, inHeight, inFormat, inLayerCount,
-            inUsage);
+    return initWithSize(inWidth, inHeight, inFormat, inLayerCount, inUsage, "[Reallocation]");
 }
 
 bool GraphicBuffer::needsReallocation(uint32_t inWidth, uint32_t inHeight,
@@ -166,11 +163,14 @@ bool GraphicBuffer::needsReallocation(uint32_t inWidth, uint32_t inHeight,
 }
 
 status_t GraphicBuffer::initWithSize(uint32_t inWidth, uint32_t inHeight,
-        PixelFormat inFormat, uint32_t inLayerCount, uint32_t inUsage)
+        PixelFormat inFormat, uint32_t inLayerCount, uint64_t inUsage,
+        std::string requestorName)
 {
     GraphicBufferAllocator& allocator = GraphicBufferAllocator::get();
     uint32_t outStride = 0;
-    status_t err = allocator.alloc(inWidth, inHeight, inFormat, inUsage, &handle, &outStride);
+    status_t err = allocator.allocate(inWidth, inHeight, inFormat, inLayerCount,
+            inUsage, &handle, &outStride, mId,
+            std::move(requestorName));
     if (err == NO_ERROR) {
         width = static_cast<int>(inWidth);
         height = static_cast<int>(inHeight);
@@ -213,7 +213,7 @@ status_t GraphicBuffer::initWithHandle(const native_handle_t* handle,
     mOwner = (method == WRAP_HANDLE) ? ownNone : ownHandle;
 
     if (method == TAKE_UNREGISTERED_HANDLE) {
-        status_t err = mBufferMapper.importBuffer(handle);
+        status_t err = mBufferMapper.importBuffer(this);
         if (err != NO_ERROR) {
             // clean up cloned handle
             if (clone) {
@@ -284,15 +284,14 @@ status_t GraphicBuffer::lockAsync(uint32_t inUsage, void** vaddr, int fenceFd)
     return res;
 }
 
-/*
 status_t GraphicBuffer::lockAsync(uint32_t inUsage, const Rect& rect,
         void** vaddr, int fenceFd)
 {
     return lockAsync(inUsage, inUsage, rect, vaddr, fenceFd);
 }
-*/
 
-status_t GraphicBuffer::lockAsync(uint32_t inUsage, const Rect& rect, void** vaddr, int fenceFd)
+status_t GraphicBuffer::lockAsync(uint64_t inProducerUsage,
+        uint64_t inConsumerUsage, const Rect& rect, void** vaddr, int fenceFd)
 {
     if (rect.left < 0 || rect.right  > width ||
         rect.top  < 0 || rect.bottom > height) {
@@ -301,7 +300,8 @@ status_t GraphicBuffer::lockAsync(uint32_t inUsage, const Rect& rect, void** vad
                 width, height);
         return BAD_VALUE;
     }
-    status_t res = getBufferMapper().lockAsync(handle, inUsage, rect, vaddr, fenceFd);
+    status_t res = getBufferMapper().lockAsync(handle, inProducerUsage,
+            inConsumerUsage, rect, vaddr, fenceFd);
     return res;
 }
 
@@ -467,7 +467,7 @@ status_t GraphicBuffer::unflatten(
     mOwner = ownHandle;
 
     if (handle != 0) {
-        status_t err = mBufferMapper.importBuffer(handle);
+        status_t err = mBufferMapper.importBuffer(this);
         if (err != NO_ERROR) {
             width = height = stride = format = usage_deprecated = 0;
             layerCount = 0;
